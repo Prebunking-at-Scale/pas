@@ -1,0 +1,44 @@
+[project]
+name = "prebunking-at-scale"
+version = "0.0.1"
+description = "The PAS monorepo."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["projects/lib/*", "projects/src/*"]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "isort>=6.0.1",
+    "memray>=1.17.2",
+    "mypy>=1.16.1",
+    "mypy-extensions>=1.1.0",
+    "pre-commit>=4.2.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
+    "pytest-sugar>=1.0.0",
+]
+
+[tool.black]
+line-length = "94"
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+warn_unused_configs = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+pythonpath = "projects/"

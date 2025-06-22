@@ -1,0 +1,25 @@
+# Crap OSX dumps everywhere
+._*
+.DS_Store
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# .terraform directory and state
+.terraform/
+*tfplan*
+*.tfstate
+*.tfstate.*
+
+# tfvars
+*.tfvars
+*.tfvars.json
+
