@@ -10,4 +10,11 @@ and code changes as we refine the approach over the coming weeks.
 
 ### Installation
 
+## TODO
 
+- [] Installation
+- [] Initialising a library
+- [] Initialising an application
+- [] Testing
+- [] Kubernetes stuff
+- [] Terraform 
