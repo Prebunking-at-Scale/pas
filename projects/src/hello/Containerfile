@@ -1,0 +1,13 @@
+# this Containerfile should be built from the repo root
+# i.e. `docker build -t pas/hello:latest --file projects/src/hello/Containerfile .`
+# i.e. `podman build -t pas/hello:latest --file projects/src/hello/Containerfile .`
+FROM python:3.13-alpine
+
+COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /bin/uv
+
+COPY dist/hello_lib-*.whl dist/hello-*.whl /tmp
+
+RUN uv pip install /tmp/hello_lib-*.whl /tmp/hello-*.whl --system
+
+# Run hello
+CMD ["python", "-m", "hello"]

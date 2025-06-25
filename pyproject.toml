@@ -16,6 +16,7 @@ members = ["projects/lib/*", "projects/src/*"]
 dev = [
     "black>=25.1.0",
     "flake8>=7.3.0",
+    "hatchling>=1.27.0",
     "isort>=6.0.1",
     "memray>=1.17.2",
     "mypy>=1.16.1",
@@ -42,3 +43,7 @@ no_implicit_optional = true
 
 [tool.pytest.ini_options]
 pythonpath = "projects/"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
