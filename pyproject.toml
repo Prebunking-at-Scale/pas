@@ -25,6 +25,7 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.2.1",
     "pytest-sugar>=1.0.0",
+    "ruff>=0.12.3",
 ]
 
 [tool.black]
@@ -40,5 +41,19 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = false
 no_implicit_optional = true
 
+[[tool.mypy.overrides]]
+module = [
+  "google.*",
+  "yt_dlp",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = "projects/"
+
+
+[tool.basedpyright]
+reportAny = false
+reportExplicitAny = false
+reportIgnoreCommentWithoutRule = false
+reportMissingTypeStubs = false
