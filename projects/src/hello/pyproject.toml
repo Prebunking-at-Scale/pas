@@ -1,0 +1,23 @@
+[project]
+name = "hello"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "hello-lib",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+hello-lib = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.build.hooks.custom]
+path = "../../../tools/hatchling_hook/hooks.py"  # Path to the hook file
