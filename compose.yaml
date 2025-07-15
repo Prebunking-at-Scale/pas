@@ -1,0 +1,14 @@
+services:
+  base_image:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/base_image:latest
+
+  tubescraper:
+    build:
+      context: ./projects/src/tubescraper
+      dockerfile: Containerfile
+      additional_contexts:
+        base_image: "service:base_image"
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
