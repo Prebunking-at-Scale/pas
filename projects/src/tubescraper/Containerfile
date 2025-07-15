@@ -1,13 +1,15 @@
 FROM base_image
 
+RUN apk add --no-cache ffmpeg
+
 COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 WORKDIR /app
 COPY uv.lock pyproject.toml /app
-ADD tubescraper /app/tubescraper
-
 RUN uv lock --no-upgrade && \
   uv sync --locked
+
+ADD tubescraper /app/tubescraper
 
 CMD ["uv", "run", "python3", "-m", "tubescraper"]
