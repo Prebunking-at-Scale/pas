@@ -1,0 +1,19 @@
+[project]
+name = "pas_log"
+version = "0.0.1"
+description = "Logging for PAS projects"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "structlog>=25.4.0",
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pas_log"]
