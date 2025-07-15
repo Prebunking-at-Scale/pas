@@ -2,8 +2,11 @@ import mimetypes
 import os
 from pathlib import Path
 
+import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
+
+logger: structlog.BoundLogger = structlog.get_logger()
 
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
@@ -31,6 +34,7 @@ def download_channel(channel_name: str, output_directory: str, archive_path: Pat
                    in retrieving channel data.
 
     """
+    log = logger.bind()
 
     opts = {
         "download_archive": archive_path,
@@ -55,13 +59,16 @@ def download_channel(channel_name: str, output_directory: str, archive_path: Pat
         channel_source = channel_name
         if not channel_source.startswith("@"):
             channel_source = f"channel/{channel_name}"
+        log.debug(f"yt_dlp downloading {channel_source}", channel_source=channel_source)
 
         try:
             info = ydl.extract_info(f"https://youtube.com/{channel_source}/shorts")
             if not isinstance(info, dict):
                 raise Exception("ydl: no info dict?")
-        except yt_dlp.DownloadError:
-            pass
+        except yt_dlp.DownloadError as ex:
+            log.error("yt_dlp download error", exc_info=ex)
+        except Exception as ex:
+            log.error("non-download error with shorts scraping?", exc_info=ex)
 
 
 def download_archivefile(bucket: Bucket, path: Path) -> None:
@@ -71,11 +78,15 @@ def download_archivefile(bucket: Bucket, path: Path) -> None:
         bucket (Bucket): The GCS bucket to download from.
         path (Path): Local path to save the archive file.
     """
+    log = logger.bind(path=path)
+
     archive_path: Path = STORAGE_PATH_PREFIX / path
     archive_blob = bucket.get_blob(archive_path)
     if not archive_blob:
+        log.debug(f"no archive for channel at {path}")
         return
 
+    log.debug(f"downloading archive from {path}")
     archive_blob.download_to_filename(filename=path)
 
 
@@ -87,16 +98,21 @@ def backup_channel(bucket: Bucket, channel_name: str, source_directory: str) -> 
         channel_name (str): Name of the YouTube channel for path organisation.
         source_directory (str): Local directory containing files to upload.
     """
+    log = logger.bind(channel_name=channel_name, source_directory=source_directory)
     for filename in os.listdir(source_directory):
         source_path: Path = Path(source_directory, filename)
         target_path: Path = STORAGE_PATH_PREFIX / channel_name / filename
 
         blob = bucket.blob(target_path)
         type, _ = mimetypes.guess_file_type(source_path)
+
+        log = log.bind(filename=filename, target_path=target_path, content_type=type)
+        log.debug(f"backing up {filename} to {target_path}")
         blob.upload_from_file(source_path, content_type=type)
 
 
 def backup_archivefile(bucket: Bucket, path: Path) -> None:
     """Uploads a download archive file to Google Cloud Storage."""
+    logger.debug("backing up archive to storage bucket", path=path)
     blob = bucket.blob(path)
     blob.upload_from_filename(path)
