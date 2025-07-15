@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tubescraper
+spec:
+  schedule: 0 4 * * *
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: workload-identity-sa
+          containers:
+            - name: tubescraper
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
+              imagePullPolicy: Always
+              env:
+                - name: STORAGE_BUCKET_NAME
+                  value: "pas-prototyping-storage"
+                - name: APP_LOG_LEVEL
+                  value: "DEBUG"

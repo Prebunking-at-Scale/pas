@@ -1,0 +1,65 @@
+[33mcommit d42ad89fa306c65a795846f63a6e0d6ba0154094[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mai-1283-scrape-youtube-shorts-from-pre-defined-channels[m[33m)[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Tue Jul 15 17:37:35 2025 +0100
+
+    feat(tubescraper): start implementing the build.
+    
+    As it stands, to build an image you add it to the compose file and
+    docker/podman-compose build it. Tubescraper has a dependency on the
+    "base_image" being built.  The builds have to re-lock the uv lockfile
+    because they strip out the unused dependencies, like the dev dependencies
+    at the top level.  Currently requires hard linking the uv lockfile to
+    the application directory, manually.
+
+[33mcommit 52b2fa0383584e3608d9887be6adb4b88d59a00c[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Tue Jul 15 16:02:26 2025 +0100
+
+    feat(tubescraper,pas_log): add logging library and integrate to tubescraper
+
+[33mcommit a2f7c8e697b302734d8f4843724cae7b1820e764[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Tue Jul 1 10:43:26 2025 +0100
+
+    feat(tubescraper): initial tubescraper (needs logging)
+
+[33mcommit f7baf7ca831e58ee88b0cffa4aa94c29e4583e45[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Sun Jun 22 21:09:16 2025 +0100
+
+    build: create placeholder directories
+
+[33mcommit 4032b4f6056895d6aa1d21352b7c73d6d8c03258[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Sun Jun 22 20:55:20 2025 +0100
+
+    docs: kinda add TODOs to documenting the repo
+
+[33mcommit 7eed2eb3e3550a4ded3e3f00ad1f095b874c681d[m
+Author: Dakota Harris <dakota.harris@fullfact.org>
+Date:   Sun Jun 22 19:18:39 2025 +0100
+
+    build: initial commit.
+    
+    The inital commit - hopefully works with minor modification.I can't
+    stand conventional commits, but some people soy for them, so I'll use
+    them. This commit sets up some infrastructure without documenting
+    it in the README - there's process that needs to be defined and
+    explained, too.
+    
+    We have a monorepo powered by uv - the root directory contains the
+    dev dependencies while project directories define their own direct
+    dependencies. The uv lockfile is at the project root to keep every
+    library and application in sync.
+    
+    This monorepo will also contain Terraform code and Kubernetes
+    manifests, as well as tooling to help deploy those. For that, the
+    .github/CODEOWNERS file contains myself (ff-dh) and James Mcminn
+    (jamesmcminn) as owners of the infrastructure and deployment
+    directories so that if there's a change there, we're marked as
+    reviewers.
+    
+    Everything is licensed under MIT. Respect to the following for helping
+    me put this together:
+    https://github.com/carderne/postmodern-mono/
+    https://github.com/JasperHG90/uv-monorepo/
