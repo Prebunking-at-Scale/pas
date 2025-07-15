@@ -1,7 +1,6 @@
 import logging
 import os
 import tempfile
-from pathlib import Path
 
 import structlog
 from google.cloud.storage import Client as StorageClient
@@ -33,12 +32,12 @@ if __name__ == "__main__":
     channels: list[str] = channels
     for channel_name in channels:
         _ = bind_contextvars(channel_name=channel_name)
-        log.info(f"archiving a new channel: {log.get_context().get("channel_name")}")
+        log.info(f"archiving a new channel: {channel_name}")
 
         with tempfile.TemporaryDirectory() as download_directory:
             log.debug("downloading to temporary directory")
-            archive_path: Path = Path("archives", channel_name)
-            download_archivefile(storage_bucket, archive_path)
-            download_channel(channel_name, download_directory, archive_path)
+            archivefile: str = f"{channel_name}_state"
+            download_archivefile(storage_bucket, archivefile)
+            download_channel(channel_name, download_directory, archivefile)
             backup_channel(storage_bucket, channel_name, download_directory)
-            backup_archivefile(storage_bucket, archive_path)
+            backup_archivefile(storage_bucket, archivefile)

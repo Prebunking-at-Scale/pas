@@ -11,7 +11,7 @@ logger: structlog.BoundLogger = structlog.get_logger()
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
-def download_channel(channel_name: str, output_directory: str, archive_path: Path) -> None:
+def download_channel(channel_name: str, output_directory: str, archivefile: str) -> None:
     """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
 
     This function connects to YouTube and downloads Shorts content from the specified
@@ -37,7 +37,7 @@ def download_channel(channel_name: str, output_directory: str, archive_path: Pat
     log = logger.bind()
 
     opts = {
-        "download_archive": archive_path,
+        "download_archive": archivefile,
         "extract_flat": "discard_in_playlist",
         "fragment_retries": 10,
         # "ignoreerrors": "only_download",
@@ -71,23 +71,23 @@ def download_channel(channel_name: str, output_directory: str, archive_path: Pat
             log.error("non-download error with shorts scraping?", exc_info=ex)
 
 
-def download_archivefile(bucket: Bucket, path: Path) -> None:
+def download_archivefile(bucket: Bucket, archivefile: str) -> None:
     """Downloads a yt_dlp archive file from GCS if it exists.
 
     Args:
         bucket (Bucket): The GCS bucket to download from.
         path (Path): Local path to save the archive file.
     """
-    log = logger.bind(path=path)
+    log = logger.bind(archive_file=archivefile)
 
-    archive_path: Path = STORAGE_PATH_PREFIX / path
+    archive_path = str(STORAGE_PATH_PREFIX / archivefile)
     archive_blob = bucket.get_blob(archive_path)
-    if not archive_blob:
-        log.debug(f"no archive for channel at {path}")
+    if (archive_blob and not archive_blob.exists()) or not archive_blob:
+        log.debug(f"no archive for channel at {archivefile}")
         return
 
-    log.debug(f"downloading archive from {path}")
-    archive_blob.download_to_filename(filename=path)
+    log.debug(f"downloading archive from {archive_path}")
+    archive_blob.download_to_filename(filename=archivefile)
 
 
 def backup_channel(bucket: Bucket, channel_name: str, source_directory: str) -> None:
@@ -100,19 +100,24 @@ def backup_channel(bucket: Bucket, channel_name: str, source_directory: str) -> 
     """
     log = logger.bind(channel_name=channel_name, source_directory=source_directory)
     for filename in os.listdir(source_directory):
-        source_path: Path = Path(source_directory, filename)
-        target_path: Path = STORAGE_PATH_PREFIX / channel_name / filename
+        source_path: str = str(Path(source_directory, filename))
+        target_path: str = str(STORAGE_PATH_PREFIX / channel_name / filename)
 
         blob = bucket.blob(target_path)
         type, _ = mimetypes.guess_file_type(source_path)
 
         log = log.bind(filename=filename, target_path=target_path, content_type=type)
         log.debug(f"backing up {filename} to {target_path}")
-        blob.upload_from_file(source_path, content_type=type)
+        blob.upload_from_filename(source_path, content_type=type)
 
 
-def backup_archivefile(bucket: Bucket, path: Path) -> None:
+def backup_archivefile(bucket: Bucket, archivefile: str) -> None:
     """Uploads a download archive file to Google Cloud Storage."""
-    logger.debug("backing up archive to storage bucket", path=path)
-    blob = bucket.blob(path)
-    blob.upload_from_filename(path)
+    logger.debug("backing up archive to storage bucket", archive_file=archivefile)
+
+    if not os.path.exists(archivefile):
+        return
+
+    backup_path = str(STORAGE_PATH_PREFIX / archivefile)
+    blob = bucket.blob(backup_path)
+    blob.upload_from_filename(archivefile)
