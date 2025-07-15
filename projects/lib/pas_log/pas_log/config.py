@@ -4,6 +4,7 @@ import sys
 from typing import Any
 
 import structlog
+from pythonjsonlogger.json import JsonFormatter
 from structlog.dev import ConsoleRenderer
 from structlog.processors import JSONRenderer
 
@@ -35,16 +36,19 @@ def pas_setup_structlog() -> int:
     _root_log_level = os.getenv("ROOT_LOG_LEVEL", "warn").upper()
     ROOT_LOG_LEVEL = logging.getLevelName(_root_log_level)
 
-    logging.basicConfig(format="%(message)s", stream=sys.stdout, level=ROOT_LOG_LEVEL)
-
     # APP_LOG_LEVEL is for our application. The "structlog" logger is used
     # throughout the application, so we don't have to mix logs.
     _app_log_level = os.getenv("APP_LOG_LEVEL", "info").upper()
     APP_LOG_LEVEL = logging.getLevelName(_app_log_level)
 
+    # wrap the root logger in json handling
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter())
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(ROOT_LOG_LEVEL)
+
     # If we're outputting to a tty, using ConsoleRenderer gives us a prettier print.
-    # To look at the rendered JSON run `python3 -m audio_transcriber > output.json`
-    # TODO: Make sure GKE outputs this as JSON and isn't allocating a pseudo-tty.
     structlog_renderer: JSONRenderer | ConsoleRenderer
     if sys.stdout.isatty():
         structlog_renderer = structlog.dev.ConsoleRenderer(event_key="message")
