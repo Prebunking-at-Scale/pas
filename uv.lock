@@ -1777,6 +1777,7 @@ source = { editable = "projects/src/tubescraper" }
 dependencies = [
     { name = "cyberdrop-dl-patched" },
     { name = "google-cloud-storage" },
+    { name = "pas-log" },
     { name = "pydantic" },
     { name = "structlog" },
     { name = "yt-dlp" },
@@ -1786,6 +1787,7 @@ dependencies = [
 requires-dist = [
     { name = "cyberdrop-dl-patched", specifier = ">=7.0.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.1" },
+    { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "yt-dlp", specifier = ">=2025.6.30" },
