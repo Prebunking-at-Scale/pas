@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "cyberdrop-dl-patched>=7.0.0",
     "google-cloud-storage>=3.1.1",
+    "pas-log",
     "pydantic>=2.11.7",
     "structlog>=25.4.0",
     "yt-dlp>=2025.6.30",
@@ -16,7 +17,7 @@ dependencies = [
 package = true
    
 [tool.uv.sources]
-pas_log = { workspace = true }
+pas-log = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
