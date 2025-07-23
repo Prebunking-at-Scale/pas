@@ -11,7 +11,6 @@ import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.hardcoded_channels import ChannelName, OrgName
 from yt_dlp.utils import DownloadError
-from yt_dlp.YoutubeDL import _Params
 
 logger: structlog.BoundLogger = structlog.get_logger()
 
@@ -53,7 +52,7 @@ def download_channel(
     """
     log = logger.bind()
 
-    opts: _Params = {
+    opts = {
         "download_archive": archivefile,
         "extract_flat": "discard_in_playlist",
         "fragment_retries": 10,
