@@ -1,3 +1,4 @@
+import json
 import mimetypes
 import os
 from datetime import datetime
@@ -15,7 +16,8 @@ from yt_dlp.YoutubeDL import _Params
 logger: structlog.BoundLogger = structlog.get_logger()
 
 API_URL = os.environ["API_URL"]
-API_KEY = os.environ["API_KEY"]
+API_KEYS = os.environ["API_KEYS"]
+API_KEY = json.loads(API_KEYS).pop()
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
