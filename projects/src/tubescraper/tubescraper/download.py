@@ -1,17 +1,29 @@
 import mimetypes
 import os
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
+from tubescraper.hardcoded_channels import ChannelName, OrgName
+from yt_dlp.utils import DownloadError
+from yt_dlp.YoutubeDL import _Params
 
 logger: structlog.BoundLogger = structlog.get_logger()
 
+API_URL = os.environ["API_URL"]
+API_KEY = os.environ["API_KEY"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
-def download_channel(channel_name: str, output_directory: str, archivefile: str) -> None:
+def download_channel(
+    channel_name: str,
+    output_directory: str,
+    archivefile: str,
+) -> dict[Any, Any] | None:
     """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
 
     This function connects to YouTube and downloads Shorts content from the specified
@@ -39,7 +51,7 @@ def download_channel(channel_name: str, output_directory: str, archivefile: str)
     """
     log = logger.bind()
 
-    opts = {
+    opts: _Params = {
         "download_archive": archivefile,
         "extract_flat": "discard_in_playlist",
         "fragment_retries": 10,
@@ -58,7 +70,7 @@ def download_channel(channel_name: str, output_directory: str, archivefile: str)
         "extractor_args": {"youtube": {"skip": ["translated_subs"]}},
         "color": {"stderr": "never", "stdout": "never"},
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name
         if not channel_source.startswith("@"):
             channel_source = f"channel/{channel_name}"
@@ -66,12 +78,14 @@ def download_channel(channel_name: str, output_directory: str, archivefile: str)
 
         try:
             info = ydl.extract_info(f"https://youtube.com/{channel_source}/shorts")
-            if not isinstance(info, dict):
+            if not info:
                 raise Exception("ydl: no info dict?")
-        except yt_dlp.DownloadError as ex:
+            return dict(info)
+        except DownloadError as ex:
             log.error("yt_dlp download error", exc_info=ex)
         except Exception as ex:
             log.error("non-download error with shorts scraping?", exc_info=ex)
+        return None
 
 
 def download_archivefile(bucket: Bucket, archivefile: str) -> None:
@@ -124,3 +138,59 @@ def backup_archivefile(bucket: Bucket, archivefile: str) -> None:
     backup_path = str(STORAGE_PATH_PREFIX / archivefile)
     blob = bucket.blob(backup_path)
     blob.upload_from_filename(archivefile)
+
+
+def check_entry_exists(video_id: str) -> bool:
+    query = {"metadata": f'$.youtube_id == "{video_id}"'}
+    with requests.post(
+        f"{API_URL}/videos/filter",
+        json=query,
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
+        data = resp.json()
+        if data.get("cursor"):
+            return True
+    return False
+
+
+def register_downloads(
+    info: dict[str, Any],
+    channel_name: ChannelName,
+    orgs: list[OrgName],
+) -> None:
+    log = logger.bind()
+    for entry in info.get("entries", []):
+        if entry.get("id") is None:
+            log = log.bind(entry=entry)
+            log.error("found channel entry without video_id? continuing")
+            continue
+
+        if check_entry_exists(entry.get("id")):
+            continue
+
+        filename = f"{entry.get("id")}.{entry.get("channel_id")}.{entry.get("timestamp")}.{entry.get("ext")}"
+        filepath = str(STORAGE_PATH_PREFIX / channel_name / filename)
+        log = log.bind(filename=filename, filepath=filepath)
+
+        data: dict[str, Any] = {
+            "channel": entry.get("uploader_id"),
+            "channel_followers": entry.get("channel_follower_count"),
+            "comments": entry.get("comment_count") or 0,
+            "description": entry.get("description"),
+            "destination_path": filepath,
+            "likes": entry.get("like_count") or 0,
+            "platform": "youtube",
+            "source_url": entry.get("webpage_url"),
+            "title": entry.get("title"),
+            "uploaded_at": str(datetime.fromtimestamp(entry.get("timestamp")).isoformat()),
+            "views": entry.get("view_count") or 0,
+            "metadata": {
+                "for_organisation": orgs,
+            },
+        }
+
+        with requests.post(
+            f"{API_URL}/videos", json=data, headers={"X-API-TOKEN": API_KEY}
+        ) as resp:
+            log.debug(f"registered {entry.get("id")} with API", data=data)
+            resp.raise_for_status()

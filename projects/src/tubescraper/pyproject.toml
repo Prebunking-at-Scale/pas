@@ -8,6 +8,8 @@ dependencies = [
     "google-cloud-storage>=3.1.1",
     "pas-log",
     "pydantic>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
     "structlog>=25.4.0",
     "yt-dlp>=2025.6.30",
 ]
@@ -24,6 +26,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "responses>=0.25.7",
     "yt-dlp-types>=0.0.17",
 ]
 
