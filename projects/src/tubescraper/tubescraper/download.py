@@ -25,13 +25,16 @@ def download_channel(channel_name: str, output_directory: str, archivefile: str)
             The custom URL name of the YouTube channel (e.g., '@ChannelName').
         output_directory (str):
             The directory path where downloaded files will be saved.
-        archive_path (Path):
+        archivefile (str):
             The file path to the download archive used to track downloaded content.
             Archive will be created if it does not exist.
 
     Raises:
-        Exception: If the extracted info from YouTube is not a dictionary, indicating a potential failure
-                   in retrieving channel data.
+        DownloadError:
+            Some yt-dlp specific error downloading from YouTube.
+        Exception:
+            If the extracted info from YouTube is not a dictionary, indicating a potential failure in retrieving
+            channel data.
 
     """
     log = logger.bind()
