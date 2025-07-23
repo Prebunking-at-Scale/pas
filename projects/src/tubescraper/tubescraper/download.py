@@ -56,7 +56,6 @@ def download_channel(
         "download_archive": archivefile,
         "extract_flat": "discard_in_playlist",
         "fragment_retries": 10,
-        # "ignoreerrors": "only_download",
         "outtmpl": {
             "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
         },
@@ -64,14 +63,25 @@ def download_channel(
             {"key": "FFmpegConcat", "only_multi_video": True, "when": "playlist"}
         ],
         "retries": 10,
+        "sleep_interval": 10.0,
+        "max_sleep_interval": 20.0,
+        "sleep_interval_requests": 0.75,
+        "sleep_interval_subtitles": 5,
         "subtitlesformat": "vtt/srt",
         "subtitleslangs": ["en.*"],
         "writeautomaticsub": True,
         "writesubtitles": True,
-        "extractor_args": {"youtube": {"skip": ["translated_subs"]}},
+        "extractor_args": {
+            "youtube": {
+                # "player_client": ["web", "mweb"],
+                "skip": ["translated_subs"],
+            }
+        },
         "color": {"stderr": "never", "stdout": "never"},
         "quiet": True,
+        "no_warnings": True,
         "noprogress": True,
+        "proxy": "http://ff:wqzjvTFWapQTXsc9NpplZ9WQUs0hZRYA@proxy.fullfact.org:3128/",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name
