@@ -12,7 +12,7 @@ from google.cloud.storage import Bucket
 from tubescraper.hardcoded_channels import ChannelName, OrgName
 from yt_dlp.utils import DownloadError
 
-logger: structlog.BoundLogger = structlog.get_logger()
+logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
@@ -70,6 +70,8 @@ def download_channel(
         "writesubtitles": True,
         "extractor_args": {"youtube": {"skip": ["translated_subs"]}},
         "color": {"stderr": "never", "stdout": "never"},
+        "quiet": True,
+        "noprogress": True,
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name

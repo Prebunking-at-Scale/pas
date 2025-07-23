@@ -20,8 +20,8 @@ from tubescraper.download import (
 from tubescraper.hardcoded_channels import channels, preprocess_channels
 
 log_level = pas_setup_structlog()
-logging.getLogger().setLevel(log_level)
-logger: structlog.BoundLogger = structlog.get_logger()
+logging.getLogger(__name__).setLevel(log_level)
+logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 """The bucket where tubescraper will store all it's output."""
