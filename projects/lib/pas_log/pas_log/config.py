@@ -4,7 +4,8 @@ import sys
 from typing import Any
 
 import structlog
-from pythonjsonlogger.json import JsonFormatter
+
+# from pythonjsonlogger.json import JsonFormatter
 from structlog.dev import ConsoleRenderer
 from structlog.processors import JSONRenderer
 
@@ -43,7 +44,7 @@ def pas_setup_structlog() -> int:
 
     # wrap the root logger in json handling
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonFormatter())
+    # handler.setFormatter(JsonFormatter())
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(ROOT_LOG_LEVEL)
