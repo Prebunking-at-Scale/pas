@@ -1,4 +1,12 @@
+from collections.abc import Iterable
+
 from dotenv import load_dotenv
+from tubescraper.keyword_downloads import (
+    backup_cursor,
+    backup_keyword_entries,
+    download_cursor,
+    download_existing_ids,
+)
 
 _ = load_dotenv()
 
@@ -7,10 +15,11 @@ import os
 import tempfile
 
 import structlog
+from google.cloud.storage import Bucket
 from google.cloud.storage import Client as StorageClient
 from pas_log import pas_setup_structlog
 from structlog.contextvars import bind_contextvars
-from tubescraper.download import (
+from tubescraper.channel_downloads import (
     backup_archivefile,
     backup_channel,
     download_archivefile,
@@ -18,6 +27,7 @@ from tubescraper.download import (
     register_downloads,
 )
 from tubescraper.hardcoded_channels import channels, preprocess_channels
+from tubescraper.hardcoded_keywords import org_keywords, preprocess_keywords
 
 log_level = pas_setup_structlog()
 logging.getLogger(__name__).setLevel(log_level)
@@ -26,14 +36,9 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 """The bucket where tubescraper will store all it's output."""
 
-if __name__ == "__main__":
-    log = logger.new()
-    log.info("Tubescraper starting up...")
 
-    storage_client = StorageClient()
-    storage_bucket = storage_client.bucket(STORAGE_BUCKET_NAME)
-    log.debug("buckets configured")
-
+def channels_downloader(storage_bucket: Bucket) -> None:
+    log = logger.bind()
     channel_map = preprocess_channels(channels)
     for channel_name, orgs in channel_map.items():
         _ = bind_contextvars(channel_name=channel_name)
@@ -53,3 +58,29 @@ if __name__ == "__main__":
 
             backup_channel(storage_bucket, channel_name, download_directory)
             backup_archivefile(storage_bucket, archivefile)
+
+
+def keywords_downloader(storage_bucket: Bucket) -> None:
+    log = logger.bind()
+    keywords: Iterable[str] = preprocess_keywords(org_keywords)
+    keywords = ["EGG SALAD DELICIOUS!"]
+    for keyword in keywords:
+        _ = bind_contextvars(keyword=keyword)
+        log.info(f"archiving a new keyword: {keyword}")
+
+        cursor = download_cursor(storage_bucket, keyword)
+        existing = download_existing_ids(storage_bucket, keyword)
+        new_cursor = backup_keyword_entries(storage_bucket, keyword, cursor, existing)
+        backup_cursor(storage_bucket, keyword, new_cursor)
+
+
+if __name__ == "__main__":
+    log = logger.new()
+    log.info("Tubescraper starting up...")
+
+    storage_client = StorageClient()
+    storage_bucket = storage_client.bucket(STORAGE_BUCKET_NAME)
+    log.debug("buckets configured")
+
+    channels_downloader(storage_bucket)
+    keywords_downloader(storage_bucket)

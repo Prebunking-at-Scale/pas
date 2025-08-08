@@ -27,7 +27,6 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "responses>=0.25.7",
-    "yt-dlp-types>=0.0.17",
 ]
 
 [tool.hatch.build.targets.wheel]
