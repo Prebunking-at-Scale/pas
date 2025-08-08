@@ -67,10 +67,6 @@ def download_channel(
         "max_sleep_interval": 20.0,
         "sleep_interval_requests": 0.75,
         "sleep_interval_subtitles": 5,
-        "subtitlesformat": "vtt/srt",
-        "subtitleslangs": ["en.*"],
-        "writeautomaticsub": True,
-        "writesubtitles": True,
         "extractor_args": {
             "youtube": {
                 # "player_client": ["web", "mweb"],
