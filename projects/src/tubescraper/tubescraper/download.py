@@ -84,6 +84,7 @@ def download_channel(
         "no_warnings": True,
         "noprogress": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        "ignoreerrors": "only_download",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name
