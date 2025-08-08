@@ -82,6 +82,7 @@ def download_channel(
         "no_warnings": True,
         "noprogress": True,
         "proxy": "http://ff:wqzjvTFWapQTXsc9NpplZ9WQUs0hZRYA@proxy.fullfact.org:3128/",
+        "ignoreerrors": "only_download",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name
