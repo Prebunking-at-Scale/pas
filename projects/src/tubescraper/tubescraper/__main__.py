@@ -2,9 +2,10 @@ from collections.abc import Iterable
 
 from dotenv import load_dotenv
 from tubescraper.keyword_downloads import (
+    backup_cursor,
+    backup_keyword_entries,
     download_cursor,
     download_existing_ids,
-    download_keyword_entries,
 )
 
 _ = load_dotenv()
@@ -62,9 +63,10 @@ def channels_downloader(storage_bucket: Bucket) -> None:
 def keywords_downloader(storage_bucket: Bucket) -> None:
     log = logger.bind()
     keywords: Iterable[str] = preprocess_keywords(org_keywords)
+    keywords = ["EGG SALAD DELICIOUS!"]
     for keyword in keywords:
         _ = bind_contextvars(keyword=keyword)
-        log.info("archiving a new keyword: {keyword}")
+        log.info(f"archiving a new keyword: {keyword}")
 
         cursor = download_cursor(storage_bucket, keyword)
         existing = download_existing_ids(storage_bucket, keyword)
@@ -80,5 +82,5 @@ if __name__ == "__main__":
     storage_bucket = storage_client.bucket(STORAGE_BUCKET_NAME)
     log.debug("buckets configured")
 
-    channels_downloader(storage_bucket)
+    # channels_downloader(storage_bucket)
     keywords_downloader(storage_bucket)

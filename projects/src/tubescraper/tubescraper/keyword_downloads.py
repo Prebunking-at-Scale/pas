@@ -4,11 +4,13 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, cast
 
+
+import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-from yt_dlp.utils import DateRange
+
+logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
@@ -33,30 +35,32 @@ def backup_cursor(bucket: Bucket, keyword: str, cursor: datetime):
 
 def download_existing_ids(bucket: Bucket, keyword: str) -> set[str]:
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
-    return {blob.name.stem for blob in bucket.list_blobs(prefix=prefix_path)}
+    return {Path(blob.name).stem for blob in bucket.list_blobs(prefix=prefix_path)}
 
 
 def backup_keyword_entries(
     bucket: Bucket,
-    output_directory: str,
     keyword: str,
     cursor: datetime,
     existing: set[str],
 ) -> datetime:
+    log = logger.bind()
+
     # returns list[object] because yt_dlp types are really inconsistent across extractors
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
 
+    log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
+
     opts = {
         "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/mp4",
-        "daterange": DateRange(cursor.date()),
+        "dateafter": cursor.date(),
         "skip_download": True,
-        "outtmpl": {
-            "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
-        },
-        'ignoreerrors': 'only_download'
+        "outtmpl": "-",
+        "ignoreerrors": "only_download",
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
+        log.info(f"downloading entries for {keyword} to {prefix_path}")
         info = ydl.extract_info(f"ytsearchdate100:{keyword}", download=False)
         if not info:
             raise yt_dlp.utils.DownloadError("Empty info dict")
@@ -65,14 +69,34 @@ def backup_keyword_entries(
         if not isinstance(entries, list):
             raise yt_dlp.utils.DownloadError("No or malformed entries")
 
+        log.debug(f"{len(entries)} entries found. iterating...")
         for entry in entries:
-            if entry["id"] in existing:
+            log.bind(entry=entry)
+
+            if not entry:
+                log.debug(f"entry is none, continuing...")
                 continue
 
-            _ = ydl.process_info(entry)
+            if entry.get("media_type") != "short":
+                log.debug(f"ignoring non-short entry, continuing...")
+                continue
+
+            if entry["id"] in existing:
+                log.debug(f"entry exists, continuing...")
+                continue
+
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                log.debug(f"redirecting stdout to StringIO buf {id(buf)}")
+                _ = ydl.process_info(entry)
+            log.debug(f"video buffered. buffer size: {buf.tell()}")
+
             blob_path = prefix_path + str(entry["id"])
+
+            log.bind(blob_path=blob_path)
+            log.debug(f"uploading blob to path {blob_path}")
             bucket.blob(blob_path).upload_from_file(
-                ,
+                buf,
                 rewind=True,
                 content_type="video/mp4",
             )
