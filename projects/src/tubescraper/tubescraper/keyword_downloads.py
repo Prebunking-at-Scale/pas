@@ -5,7 +5,6 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
@@ -53,11 +52,9 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/mp4",
         "dateafter": cursor.date(),
-        "skip_download": True,
-        "outtmpl": "-",
         "ignoreerrors": "only_download",
+        "logtostderr": True,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")
@@ -85,21 +82,29 @@ def backup_keyword_entries(
                 log.debug(f"entry exists, continuing...")
                 continue
 
-            buf = io.StringIO()
-            with contextlib.redirect_stdout(buf):
-                log.debug(f"redirecting stdout to StringIO buf {id(buf)}")
-                _ = ydl.process_info(entry)
+            # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
+            # if we use any other format yt-dlp has to merge video and audio streams
+            # separately, which results in the output not correctly being written to stdout
+            # (something to do with subprocesses? not sure) so this is something to consider
+            # when making a change here
+            ctx = {
+                "outtmpl": "-",
+                "logtostderr": True,
+                "format": "18",
+            }
+            buf = io.BytesIO()
+            # buf.close = lambda *_: ...
+            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
+                log.debug(f"downloading to buffer {id(buf)}")
+                video.download([entry["id"]])
             log.debug(f"video buffered. buffer size: {buf.tell()}")
+            buf.seek(0)
 
             blob_path = prefix_path + str(entry["id"])
 
             log.bind(blob_path=blob_path)
             log.debug(f"uploading blob to path {blob_path}")
-            bucket.blob(blob_path).upload_from_file(
-                buf,
-                rewind=True,
-                content_type="video/mp4",
-            )
+            bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
 
             upload_date = datetime.strptime(entry["upload_date"], "%Y%m%d")
             upload_date_utc = upload_date.replace(tzinfo=timezone.utc)
