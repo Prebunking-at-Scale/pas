@@ -17,6 +17,8 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
+PROXY_USERNAME = os.environ["PROXY_USERNAME"]
+PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
@@ -81,7 +83,7 @@ def download_channel(
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
-        "proxy": "http://ff:wqzjvTFWapQTXsc9NpplZ9WQUs0hZRYA@proxy.fullfact.org:3128/",
+        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name

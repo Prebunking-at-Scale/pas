@@ -29,3 +29,13 @@ spec:
                     secretKeyRef:
                       name: core-api-keys
                       key: keys
+                - name: PROXY_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: proxy-credentials
+                      key: username
+                - name: PROXY_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: proxy-credentials
+                      key: password
