@@ -908,7 +908,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "responses" },
-    { name = "yt-dlp-types" },
 ]
 
 [package.metadata]
@@ -923,10 +922,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "responses", specifier = ">=0.25.7" },
-    { name = "yt-dlp-types", specifier = ">=0.0.17" },
-]
+dev = [{ name = "responses", specifier = ">=0.25.7" }]
 
 [[package]]
 name = "typing-extensions"
@@ -988,16 +984,4 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/23/9c/ff64c2fed7909f43a9a0aedb7395c65404e71c2439198764685a6e3b3059/yt_dlp-2025.6.30.tar.gz", hash = "sha256:6d0ae855c0a55bfcc28dffba804ec8525b9b955d34a41191a1561a4cec03d8bd", size = 3034364, upload-time = "2025-06-30T23:58:36.605Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/41/2f048ae3f6d0fa2e59223f08ba5049dbcdac628b0a9f9deac722dd9260a5/yt_dlp-2025.6.30-py3-none-any.whl", hash = "sha256:541becc29ed7b7b3a08751c0a66da4b7f8ee95cb81066221c78e83598bc3d1f3", size = 3279333, upload-time = "2025-06-30T23:58:34.911Z" },
-]
-
-[[package]]
-name = "yt-dlp-types"
-version = "0.0.17"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/45/a1/5c9efb63b0c403e36317cfcb4f578e7f2b7b02bf2ae358a01d6551df5262/yt_dlp_types-0.0.17.tar.gz", hash = "sha256:f70773cca5ecb291b91a22fc3b0a9765946b869ad0bfbc222b68ecc3d095bb0a", size = 35115, upload-time = "2025-06-08T05:27:46.787Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/95/22/d2008cfc3e6ba9bf77c0bc620d95a57d9cab3924605b4a5496ad0e6b4644/yt_dlp_types-0.0.17-py3-none-any.whl", hash = "sha256:f58253b95f304a477370b22cc76973ccc5fabdf4aba8e76c1029d916f8a9bd1f", size = 49878, upload-time = "2025-06-08T05:27:45.716Z" },
 ]
