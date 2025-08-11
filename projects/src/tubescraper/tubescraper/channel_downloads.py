@@ -1,7 +1,7 @@
 import json
 import mimetypes
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -185,6 +185,10 @@ def register_downloads(
         filepath = str(STORAGE_PATH_PREFIX / channel_name / filename)
         log = log.bind(filename=filename, filepath=filepath)
 
+        uploaded_at = datetime.strptime(entry["upload_date"], "%Y%m%d").replace(
+            tzinfo=timezone.utc
+        )
+
         data: dict[str, Any] = {
             "channel": entry.get("uploader_id"),
             "channel_followers": entry.get("channel_follower_count"),
@@ -195,7 +199,7 @@ def register_downloads(
             "platform": "youtube",
             "source_url": entry.get("webpage_url"),
             "title": entry.get("title"),
-            "uploaded_at": str(datetime.fromtimestamp(entry.get("timestamp")).isoformat()),
+            "uploaded_at": uploaded_at.isoformat(),
             "views": entry.get("view_count") or 0,
             "metadata": {
                 "for_organisation": orgs,
