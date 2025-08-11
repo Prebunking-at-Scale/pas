@@ -63,7 +63,6 @@ def channels_downloader(storage_bucket: Bucket) -> None:
 def keywords_downloader(storage_bucket: Bucket) -> None:
     log = logger.bind()
     keywords: Iterable[str] = preprocess_keywords(org_keywords)
-    keywords = ["EGG SALAD DELICIOUS!"]
     for keyword in keywords:
         _ = bind_contextvars(keyword=keyword)
         log.info(f"archiving a new keyword: {keyword}")
