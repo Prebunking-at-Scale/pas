@@ -185,9 +185,11 @@ def register_downloads(
         filepath = str(STORAGE_PATH_PREFIX / channel_name / filename)
         log = log.bind(filename=filename, filepath=filepath)
 
-        uploaded_at = datetime.strptime(entry["upload_date"], "%Y%m%d").replace(
-            tzinfo=timezone.utc
-        )
+        uploaded_at = None
+        if upload_date := entry.get("upload_date"):
+            uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(
+                tzinfo=timezone.utc
+            )
 
         data: dict[str, Any] = {
             "channel": entry.get("uploader_id"),
@@ -199,7 +201,9 @@ def register_downloads(
             "platform": "youtube",
             "source_url": entry.get("webpage_url"),
             "title": entry.get("title"),
-            "uploaded_at": uploaded_at.isoformat(),
+            "uploaded_at": (
+                uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else uploaded_at
+            ),
             "views": entry.get("view_count") or 0,
             "metadata": {
                 "for_organisation": orgs,
