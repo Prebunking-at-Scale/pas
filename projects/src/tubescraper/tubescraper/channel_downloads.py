@@ -77,9 +77,11 @@ def download_channel(
             }
         },
         "color": {"stderr": "never", "stdout": "never"},
-        "quiet": True,
-        "no_warnings": True,
-        "noprogress": True,
+        # "quiet": True,
+        # "no_warnings": True,
+        # "noprogress": True,
+        "verbose": True,
+        "ignoreerrors": "only_download",
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "format": "18",
     }

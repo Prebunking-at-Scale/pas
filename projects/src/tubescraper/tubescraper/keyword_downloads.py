@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
@@ -93,7 +94,6 @@ def backup_keyword_entries(
                 "format": "18",
             }
             buf = io.BytesIO()
-            # buf.close = lambda *_: ...
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
                 log.debug(f"downloading to buffer {id(buf)}")
                 video.download([entry["id"]])
@@ -110,3 +110,16 @@ def backup_keyword_entries(
             upload_date_utc = upload_date.replace(tzinfo=timezone.utc)
             latest_seen = max(latest_seen, upload_date_utc)
     return latest_seen
+
+
+def check_entry_exists(video_id: str) -> bool:
+    query = {"metadata": f'$.youtube_id == "{video_id}"'}
+    with requests.post(
+        f"{API_URL}/videos/filter",
+        json=query,
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
+        data = resp.json()
+        if data.get("cursor"):
+            return True
+    return False
