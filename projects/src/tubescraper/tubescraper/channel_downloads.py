@@ -17,6 +17,8 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
+PROXY_USERNAME = os.environ["PROXY_USERNAME"]
+PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
@@ -54,7 +56,6 @@ def download_channel(
 
     opts = {
         "download_archive": archivefile,
-        "extract_flat": "discard_in_playlist",
         "fragment_retries": 10,
         "outtmpl": {
             "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
@@ -66,22 +67,21 @@ def download_channel(
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
         "sleep_interval_requests": 0.75,
-        "sleep_interval_subtitles": 5,
-        "subtitlesformat": "vtt/srt",
-        "subtitleslangs": ["en.*"],
-        "writeautomaticsub": True,
-        "writesubtitles": True,
+        "writeautomaticsub": False,
+        "writesubtitles": False,
         "extractor_args": {
             "youtube": {
-                # "player_client": ["web", "mweb"],
-                "skip": ["translated_subs"],
+                "player_client": ["web"],
+                "player_skip": ["configs", "initial_data"],
+                "skip": ["dash", "hls", "translated_subs"],
             }
         },
         "color": {"stderr": "never", "stdout": "never"},
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
-        "proxy": "http://ff:wqzjvTFWapQTXsc9NpplZ9WQUs0hZRYA@proxy.fullfact.org:3128/",
+        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        "format": "18",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
         channel_source = channel_name
@@ -172,7 +172,10 @@ def register_downloads(
     orgs: list[OrgName],
 ) -> None:
     log = logger.bind()
-    for entry in info.get("entries", []):
+
+    entries = info.get("entries", [])
+    log.debug(f"registering {len(entries)} videos with API")
+    for entry in entries:
         if entry.get("id") is None:
             log = log.bind(entry=entry)
             log.error("found channel entry without video_id? continuing")
@@ -210,8 +213,16 @@ def register_downloads(
             },
         }
 
-        with requests.post(
-            f"{API_URL}/videos", json=data, headers={"X-API-TOKEN": API_KEY}
-        ) as resp:
-            log.debug(f"registered {entry.get("id")} with API", data=data)
-            resp.raise_for_status()
+        try:
+            with requests.post(
+                f"{API_URL}/videos", json=data, headers={"X-API-TOKEN": API_KEY}
+            ) as resp:
+                log.debug(f"registered {entry.get("id")} with API", data=data)
+                resp.raise_for_status()
+
+        except requests.HTTPError as ex:
+            log.error(
+                f"couldn't post to video api, video_id: {entry["id"]}",
+                exc_info=ex,
+                entry=entry,
+            )
