@@ -178,6 +178,9 @@ def register_downloads(
     entries = info.get("entries", [])
     log.debug(f"registering {len(entries)} videos with API")
     for entry in entries:
+        if not entry:
+            continue
+
         if entry.get("id") is None:
             log = log.bind(entry=entry)
             log.error("found channel entry without video_id? continuing")
