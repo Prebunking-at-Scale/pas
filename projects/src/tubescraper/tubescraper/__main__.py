@@ -44,7 +44,7 @@ def channels_downloader(storage_bucket: Bucket) -> None:
         _ = bind_contextvars(channel_name=channel_name)
         log.info(f"archiving a new channel: {channel_name}")
 
-        with tempfile.TemporaryDirectory(delete=False) as download_directory:
+        with tempfile.TemporaryDirectory() as download_directory:
             log.debug("downloading to temporary directory")
             archivefile: str = f"{channel_name}_state"
             download_archivefile(storage_bucket, archivefile)
