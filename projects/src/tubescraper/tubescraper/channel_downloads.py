@@ -11,6 +11,7 @@ import yt_dlp
 import yt_dlp.utils
 from google.cloud.storage import Bucket
 from tubescraper.hardcoded_channels import ChannelName, OrgName
+from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.utils import DownloadError
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -65,6 +66,8 @@ def download_channel(
         "postprocessors": [
             {"key": "FFmpegConcat", "only_multi_video": True, "when": "playlist"}
         ],
+        "playlist_items": "1:100",
+        "impersonate": ImpersonateTarget(client="chrome"),
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
@@ -84,7 +87,7 @@ def download_channel(
         # "noprogress": True,
         "verbose": True,
         "ignoreerrors": "only_download",
-        # "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "format": "18",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:

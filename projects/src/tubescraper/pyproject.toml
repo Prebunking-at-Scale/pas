@@ -5,6 +5,7 @@ description = "Scrapes YouTube, unsurprisingly"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "curl-cffi>=0.13.0",
     "google-cloud-storage>=3.1.1",
     "pas-log",
     "pydantic>=2.11.7",
