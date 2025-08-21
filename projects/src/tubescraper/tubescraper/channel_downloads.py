@@ -193,8 +193,11 @@ def register_downloads(
             log.error("found channel entry without video_id? continuing")
             continue
 
-        if check_entry_exists(entry.get("id")):
-            continue
+        try:
+            if check_entry_exists(entry.get("id")):
+                continue
+        except Exception:
+            log.warning(f"Couldn't check if id exists {entry.get("id")}")
 
         filename = f"{entry.get("id")}.{entry.get("channel_id")}.{entry.get("timestamp")}.{entry.get("ext")}"
         filepath = str(STORAGE_PATH_PREFIX / channel_name / filename)
@@ -232,7 +235,7 @@ def register_downloads(
                 log.debug(f"registered {entry.get("id")} with API", data=data)
                 resp.raise_for_status()
 
-        except requests.HTTPError as ex:
+        except Exception as ex:
             log.error(
                 f"couldn't post to video api, video_id: {entry["id"]}",
                 exc_info=ex,
