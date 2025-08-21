@@ -19,6 +19,7 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
+POT_PROVIDER_URL = os.environ["POT_PROVIDER_URL"]
 PROXY_USERNAME = os.environ["PROXY_USERNAME"]
 PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
@@ -76,10 +77,11 @@ def download_channel(
         "writesubtitles": False,
         "extractor_args": {
             "youtube": {
-                "player_client": ["web"],
+                "player_client": ["web", "web_embedded"],
                 "player_skip": ["configs", "initial_data"],
                 "skip": ["dash", "hls", "translated_subs"],
-            }
+            },
+            "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
         "color": {"stderr": "never", "stdout": "never"},
         # "quiet": True,

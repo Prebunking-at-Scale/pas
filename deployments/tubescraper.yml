@@ -14,9 +14,26 @@ spec:
           restartPolicy: Never
           serviceAccountName: workload-identity-sa
           containers:
+            - name: youtubepot-bgutil
+              image: brainicism/bgutil-ytdlp-pot-provider:1.1.0
+              imagePullPolicy: Always
+              resources:
+                limits:
+                  cpu: 1
+                  memory: 512M
+                requests:
+                  cpu: 0.1
+                  memory: 256M
             - name: tubescraper
               image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
               imagePullPolicy: Always
+              resources:
+                limits:
+                  cpu: 2
+                  memory: 8G
+                requests:
+                  cpu: 1
+                  memory: 2G
               env:
                 - name: STORAGE_BUCKET_NAME
                   value: "pas-prototyping-storage"
@@ -31,6 +48,8 @@ spec:
                     secretKeyRef:
                       name: core-api-keys
                       key: keys
+                - name: POT_PROVIDER_URL
+                  value: http://localhost:4416
                 - name: PROXY_USERNAME
                   valueFrom:
                     secretKeyRef:
