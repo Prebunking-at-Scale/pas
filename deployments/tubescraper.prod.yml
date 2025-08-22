@@ -15,7 +15,7 @@ spec:
           serviceAccountName: workload-identity-sa
           containers:
             - name: youtubepot-bgutil
-              image: brainicism/bgutil-ytdlp-pot-provider:1.1.0
+              image: brainicism/bgutil-ytdlp-pot-provider:1.2.2
               imagePullPolicy: Always
               resources:
                 limits:
