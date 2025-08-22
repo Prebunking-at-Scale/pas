@@ -5,10 +5,12 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
+
+from tubescraper.hardcoded_channels import OrgName
+from tubescraper.register import register_download
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -43,6 +45,7 @@ def backup_keyword_entries(
     keyword: str,
     cursor: datetime,
     existing: set[str],
+    orgs: list[OrgName],
 ) -> datetime:
     log = logger.bind()
 
@@ -72,15 +75,15 @@ def backup_keyword_entries(
             log.bind(entry=entry)
 
             if not entry:
-                log.debug(f"entry is none, continuing...")
+                log.debug("entry is none, continuing...")
                 continue
 
             if entry.get("media_type") != "short":
-                log.debug(f"ignoring non-short entry, continuing...")
+                log.debug("ignoring non-short entry, continuing...")
                 continue
 
             if entry["id"] in existing:
-                log.debug(f"entry exists, continuing...")
+                log.debug("entry exists, continuing...")
                 continue
 
             # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
@@ -106,20 +109,9 @@ def backup_keyword_entries(
             log.debug(f"uploading blob to path {blob_path}")
             bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
 
+            register_download(entry, orgs)
+
             upload_date = datetime.strptime(entry["upload_date"], "%Y%m%d")
             upload_date_utc = upload_date.replace(tzinfo=timezone.utc)
             latest_seen = max(latest_seen, upload_date_utc)
     return latest_seen
-
-
-def check_entry_exists(video_id: str) -> bool:
-    query = {"metadata": f'$.youtube_id == "{video_id}"'}
-    with requests.post(
-        f"{API_URL}/videos/filter",
-        json=query,
-        headers={"X-API-TOKEN": API_KEY},
-    ) as resp:
-        data = resp.json()
-        if data.get("cursor"):
-            return True
-    return False
