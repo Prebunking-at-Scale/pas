@@ -3,11 +3,17 @@ type Keyword = str
 type Topics = dict[Keyword, list[str]]
 
 
-def preprocess_keywords(org_keywords: dict[OrgName, Topics]) -> set[str]:
-    res: set[str] = set()
-    for _, topic in org_keywords.items():
+def preprocess_keywords(
+    org_keywords: dict[OrgName, Topics],
+) -> dict[str, list[OrgName]]:
+    res: dict[str, list[OrgName]] = {}
+    for org_name, topic in org_keywords.items():
         for _, keywords in topic.items():
-            res.update(keywords)
+            for keyword in keywords:
+                if keyword not in res:
+                    res[keyword] = []
+                if org_name not in res[keyword]:
+                    res[keyword].append(org_name)
     return res
 
 
