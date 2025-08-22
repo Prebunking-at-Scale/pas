@@ -1,12 +1,7 @@
 from dotenv import load_dotenv
-from tubescraper.keyword_downloads import (
-    backup_cursor,
-    backup_keyword_entries,
-    download_cursor,
-    download_existing_ids,
-)
 
 _ = load_dotenv()
+
 
 import logging
 import os
@@ -19,13 +14,17 @@ from pas_log import pas_setup_structlog
 from structlog.contextvars import bind_contextvars
 from tubescraper.channel_downloads import (
     backup_archivefile,
-    backup_channel,
     download_archivefile,
     download_channel,
 )
 from tubescraper.hardcoded_channels import OrgName, channels, preprocess_channels
 from tubescraper.hardcoded_keywords import org_keywords, preprocess_keywords
-from tubescraper.register import register_downloads
+from tubescraper.keyword_downloads import (
+    backup_cursor,
+    backup_keyword_entries,
+    download_cursor,
+    download_existing_ids,
+)
 
 log_level = pas_setup_structlog()
 logging.getLogger(__name__).setLevel(log_level)
@@ -47,13 +46,17 @@ def channels_downloader(storage_bucket: Bucket) -> None:
             archivefile: str = f"{channel_name}_state"
             download_archivefile(storage_bucket, archivefile)
 
-            info = download_channel(channel_name, download_directory, archivefile)
+            info = download_channel(
+                channel_name,
+                download_directory,
+                archivefile,
+                storage_bucket,
+                orgs,
+            )
             if not info:
                 log.error("no info, skipping channel backup")
                 continue
 
-            register_downloads(info, orgs)
-            backup_channel(storage_bucket, channel_name, download_directory)
             backup_archivefile(storage_bucket, archivefile)
 
 

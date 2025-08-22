@@ -1,14 +1,16 @@
 import mimetypes
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import structlog
 import yt_dlp
 import yt_dlp.utils
 from google.cloud.storage import Bucket
+from tubescraper.hardcoded_channels import OrgName
+from tubescraper.register import register_download
 from yt_dlp.networking.impersonate import ImpersonateTarget
-from yt_dlp.utils import DownloadError
+from yt_dlp.utils import DownloadError, RejectedVideoReached
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -20,7 +22,11 @@ STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
 def download_channel(
-    channel_name: str, output_directory: str, archivefile: str
+    channel_name: str,
+    output_directory: str,
+    archivefile: str,
+    bucket: Bucket,
+    orgs: list[OrgName],
 ) -> dict[Any, Any] | None:
     """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
 
@@ -53,9 +59,11 @@ def download_channel(
         "download_archive": archivefile,
         "fragment_retries": 10,
         "daterange": yt_dlp.utils.DateRange("today-1month", "today"),  # type: ignore
+        "break_on_reject": True,
         "outtmpl": {
             "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
         },
+        "progress_hooks": [progress_hook_register(bucket, orgs)],
         "postprocessors": [
             {"key": "FFmpegConcat", "only_multi_video": True, "when": "playlist"}
         ],
@@ -96,10 +104,23 @@ def download_channel(
             if not info:
                 raise Exception("ydl: no info dict?")
             return dict(info)
+        except RejectedVideoReached:
+            log.debug("rejected video reached, end of date range or video seen 👍")
         except DownloadError as ex:
             log.error("yt_dlp download error", exc_info=ex)
         except Exception as ex:
             log.error("non-download error with shorts scraping?", exc_info=ex)
+
+
+def progress_hook_register(
+    bucket: Bucket, orgs: list[OrgName]
+) -> Callable[[dict[str, Any]], None]:
+    def hook(d: dict[Any, Any]) -> None:
+        if d["status"] == "finished":
+            if backup_youtube_video(bucket, d["info_dict"]):
+                register_download(d["info_dict"], orgs)
+
+    return hook
 
 
 def download_archivefile(bucket: Bucket, archivefile: str) -> None:
@@ -121,7 +142,7 @@ def download_archivefile(bucket: Bucket, archivefile: str) -> None:
     archive_blob.download_to_filename(filename=archivefile)
 
 
-def backup_channel(bucket: Bucket, channel_name: str, source_directory: str) -> None:
+def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     """Uploads downloaded files from a channel to Google Cloud Storage.
 
     Args:
@@ -129,17 +150,34 @@ def backup_channel(bucket: Bucket, channel_name: str, source_directory: str) -> 
         channel_name (str): Name of the YouTube channel for path organisation.
         source_directory (str): Local directory containing files to upload.
     """
-    log = logger.bind(channel_name=channel_name, source_directory=source_directory)
-    for filename in os.listdir(source_directory):
-        source_path: str = str(Path(source_directory, filename))
-        target_path: str = str(STORAGE_PATH_PREFIX / channel_name / filename)
+    channel_id = info.get("channel_id", "unknown")
+    filename = info.get("filename")
 
-        blob = bucket.blob(target_path)
-        type, _ = mimetypes.guess_file_type(source_path)
+    log = logger.bind(channel_id=channel_id, filename=filename)
 
-        log = log.bind(filename=filename, target_path=target_path, content_type=type)
-        log.debug(f"backing up {filename} to {target_path}")
-        blob.upload_from_filename(source_path, content_type=type)
+    if not filename:
+        log.error(f"filename missing for video {info.get("id")}")
+        return False
+
+    basename = os.path.basename(filename)
+
+    source_path: str = str(filename)
+    target_path: str = str(STORAGE_PATH_PREFIX / channel_id / basename)
+    type, _ = mimetypes.guess_file_type(source_path)
+
+    log = log.bind(
+        filename=filename,
+        basename=basename,
+        source_path=source_path,
+        target_path=target_path,
+        content_type=type,
+    )
+
+    log.debug(f"backing up {filename} to {target_path}")
+
+    blob = bucket.blob(target_path)
+    blob.upload_from_filename(source_path, content_type=type)
+    return True
 
 
 def backup_archivefile(bucket: Bucket, archivefile: str) -> None:
