@@ -25,7 +25,7 @@ from tubescraper.channel_downloads import (
 )
 from tubescraper.hardcoded_channels import OrgName, channels, preprocess_channels
 from tubescraper.hardcoded_keywords import org_keywords, preprocess_keywords
-from tubescraper.tubescraper.register import register_downloads
+from tubescraper.register import register_downloads
 
 log_level = pas_setup_structlog()
 logging.getLogger(__name__).setLevel(log_level)
@@ -66,9 +66,7 @@ def keywords_downloader(storage_bucket: Bucket) -> None:
 
         cursor = download_cursor(storage_bucket, keyword)
         existing = download_existing_ids(storage_bucket, keyword)
-        new_cursor = backup_keyword_entries(
-            storage_bucket, keyword, cursor, existing, orgs
-        )
+        new_cursor = backup_keyword_entries(storage_bucket, keyword, cursor, existing, orgs)
         backup_cursor(storage_bucket, keyword, new_cursor)
 
 

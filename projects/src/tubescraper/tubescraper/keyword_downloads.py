@@ -8,15 +8,17 @@ from pathlib import Path
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-
 from tubescraper.hardcoded_channels import OrgName
 from tubescraper.register import register_download
+from yt_dlp import ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
+PROXY_USERNAME = os.environ["PROXY_USERNAME"]
+PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper/keywords")
 
 
@@ -57,8 +59,10 @@ def backup_keyword_entries(
 
     opts = {
         "dateafter": cursor.date(),
+        "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
+        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")

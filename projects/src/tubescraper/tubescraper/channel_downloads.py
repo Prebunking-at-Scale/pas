@@ -20,9 +20,7 @@ STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
 def download_channel(
-    channel_name: str,
-    output_directory: str,
-    archivefile: str,
+    channel_name: str, output_directory: str, archivefile: str
 ) -> dict[Any, Any] | None:
     """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
 
@@ -73,7 +71,7 @@ def download_channel(
             "youtube": {
                 "player_client": ["web", "web_embedded"],
                 "player_skip": ["configs", "initial_data"],
-                "skip": ["dash", "hls", "translated_subs"],
+                "skip": ["dash", "hls", "translated_subs", "subs"],
             },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
@@ -92,6 +90,7 @@ def download_channel(
             channel_source = f"channel/{channel_name}"
         log.debug(f"yt_dlp downloading {channel_source}", channel_source=channel_source)
 
+        info = {}
         try:
             info = ydl.extract_info(f"https://youtube.com/{channel_source}/shorts")
             if not info:
@@ -101,7 +100,6 @@ def download_channel(
             log.error("yt_dlp download error", exc_info=ex)
         except Exception as ex:
             log.error("non-download error with shorts scraping?", exc_info=ex)
-        return None
 
 
 def download_archivefile(bucket: Bucket, archivefile: str) -> None:

@@ -45,18 +45,22 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
-        return
+        return None
 
     entry_id = entry.get("id")
     if entry_id is None:
         log.error("found channel entry without video_id? continuing")
-        return
+        return None
 
     try:
         if check_entry_exists(entry_id):
-            return
+            return None
     except Exception:
         log.warning(f"Couldn't check if id exists {entry.get('id')}")
+
+    if not entry.get("video_ext"):
+        log.warning(f"we didn't download video {entry_id}, skipping")
+        return None
 
     channel_id = entry.get("channel_id", "")
     if not channel_id:
@@ -69,9 +73,7 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
 
     uploaded_at = None
     if upload_date := entry.get("upload_date"):
-        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(
-            tzinfo=timezone.utc
-        )
+        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
 
     data: dict[str, Any] = {
         "channel": entry.get("uploader_id"),
@@ -84,9 +86,7 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
         "source_url": entry.get("webpage_url"),
         "title": entry.get("title"),
         "uploaded_at": (
-            uploaded_at.isoformat()
-            if isinstance(uploaded_at, datetime)
-            else uploaded_at
+            uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else uploaded_at
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {
