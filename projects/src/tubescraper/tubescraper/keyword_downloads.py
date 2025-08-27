@@ -103,7 +103,7 @@ def backup_keyword_entries(
             buf = io.BytesIO()
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
                 log.debug(f"downloading to buffer {id(buf)}")
-                video.download([entry["id"]])
+                video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
             log.debug(f"video buffered. buffer size: {buf.tell()}")
             buf.seek(0)
 
