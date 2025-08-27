@@ -31,6 +31,8 @@ def id_for_channel(s: str) -> str:
         "retries": 10,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
+        if not s.startswith("@"):
+            s = f"channel/{s}"
         info = ydl.extract_info(f"https://youtube.com/{s}")
         if not info:
             logger.warning("No info dict returned from yt-dlp", channel_identifier=s)
