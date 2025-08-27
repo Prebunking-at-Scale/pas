@@ -1,6 +1,6 @@
 import mimetypes
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Callable
 
 import structlog
@@ -21,8 +21,28 @@ PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
+def id_for_channel(s: str) -> str:
+    opts = {
+        "extract_flat": False,
+        "fragment_retries": 10,
+        "ignoreerrors": "only_download",
+        "noprogress": True,
+        "playlist_items": "0",
+        "retries": 10,
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"https://youtube.com/{s}")
+        if not info:
+            logger.warning("No info dict returned from yt-dlp", channel_identifier=s)
+            raise ValueError("No info dict from yt_dlp")
+
+        if res := info.get("channel_id"):
+            return res  # type: ignore
+        raise ValueError("Channel without channel ID? Something's wrong")
+
+
 def download_channel(
-    channel_name: str,
+    channel_id: str,
     output_directory: str,
     archivefile: str,
     bucket: Bucket,
@@ -93,14 +113,11 @@ def download_channel(
         "format": "18",
     }
     with yt_dlp.YoutubeDL(params=opts) as ydl:
-        channel_source = channel_name
-        if not channel_source.startswith("@"):
-            channel_source = f"channel/{channel_name}"
-        log.debug(f"yt_dlp downloading {channel_source}", channel_source=channel_source)
+        log.debug(f"yt_dlp downloading {channel_id}", channel_id=channel_id)
 
         info = {}
         try:
-            info = ydl.extract_info(f"https://youtube.com/{channel_source}/shorts")
+            info = ydl.extract_info(f"https://youtube.com/channel/{channel_id}/shorts")
             if not info:
                 raise Exception("ydl: no info dict?")
             return dict(info)
@@ -121,6 +138,32 @@ def progress_hook_register(
                 register_download(d["info_dict"], orgs)
 
     return hook
+
+
+def fix_archivefile(bucket: Bucket, archivefile: str, channel_id: str) -> None:
+    """
+    Ensure the yt-dlp archive file exists. If missing, reconstruct it by
+    listing objects in the given bucket under the channel prefix and writing
+    video IDs in yt-dlp archive format.
+    """
+    log = logger.bind(archive_file=archivefile, channel_id=channel_id)
+
+    if os.path.exists(archivefile):
+        log.info("Archive file already exists, skipping build")
+        return
+
+    log.info("Building archive file from bucket contents")
+    prefix_path = str(STORAGE_PATH_PREFIX / channel_id) + "/"
+    filenames = [PurePath(blob.name).name for blob in bucket.list_blobs(prefix=prefix_path)]
+    log.debug("Collected filenames from bucket", count=len(filenames))
+
+    with open(archivefile, "w") as fh:
+        for filename in filenames:
+            video_id, *_ = filename.split(".")
+            fh.write(f"youtube {video_id}\n")
+
+    log.info("Archive file successfully built", entries=len(filenames))
+    return
 
 
 def download_archivefile(bucket: Bucket, archivefile: str) -> None:

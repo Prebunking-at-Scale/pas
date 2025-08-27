@@ -37,7 +37,7 @@ def backup_cursor(bucket: Bucket, keyword: str, cursor: datetime):
     cursor_blob.upload_from_string(cursor.isoformat())
 
 
-def download_existing_ids(bucket: Bucket, keyword: str) -> set[str]:
+def download_existing_ids_for_keyword(bucket: Bucket, keyword: str) -> set[str]:
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
     return {Path(blob.name).stem for blob in bucket.list_blobs(prefix=prefix_path)}
 
