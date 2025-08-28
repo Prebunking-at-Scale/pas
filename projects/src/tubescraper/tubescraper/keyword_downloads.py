@@ -10,7 +10,7 @@ import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.hardcoded_channels import OrgName
 from tubescraper.register import register_download
-from yt_dlp import ImpersonateTarget
+from yt_dlp import DownloadError, ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -103,7 +103,16 @@ def backup_keyword_entries(
             buf = io.BytesIO()
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
                 log.debug(f"downloading to buffer {id(buf)}")
-                video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                try:
+                    video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                except DownloadError as ex:
+                    log.error("yt_dlp download error, skipping", exc_info=ex)
+                    continue
+                except Exception as ex:
+                    log.error(
+                        "non-download error with shorts scraping?, skipping", exc_info=ex
+                    )
+                    continue
             log.debug(f"video buffered. buffer size: {buf.tell()}")
             buf.seek(0)
 
