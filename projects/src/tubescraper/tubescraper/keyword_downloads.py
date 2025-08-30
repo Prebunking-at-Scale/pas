@@ -49,7 +49,7 @@ def backup_keyword_entries(
     existing: set[str],
     orgs: list[OrgName],
 ) -> datetime:
-    log = logger.bind()
+    log = logger.new()
 
     # returns list[object] because yt_dlp types are really inconsistent across extractors
     latest_seen = cursor

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 _ = load_dotenv()
 
 
+import gc
 import logging
 import os
 import tempfile
@@ -81,6 +82,9 @@ def keywords_downloader(storage_bucket: Bucket) -> None:
         existing = download_existing_ids_for_keyword(storage_bucket, keyword)
         new_cursor = backup_keyword_entries(storage_bucket, keyword, cursor, existing, orgs)
         backup_cursor(storage_bucket, keyword, new_cursor)
+
+        # maybe fix memory leak?
+        _ = gc.collect()
 
 
 if __name__ == "__main__":
