@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import time
 
 import structlog
 import yt_dlp
@@ -61,15 +62,14 @@ def backup_keyword_entries(
     opts = {
         # "dateafter": cursor.date(),
         "retries": 10,
-        "sleep_interval": 5.0,
-        "max_sleep_interval": 5.0,
-        "sleep_interval_requests": 0.75,
+        "sleep_interval": 10.0,
+        "max_sleep_interval": 20.0,
+        "sleep_interval_requests": 1.0,
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "lazy_playlist": True,
-        # "match_filter": match_filter_func(["media_type=short"], None),
         "extract_flat": True,
         "extractor_args": {
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
@@ -78,7 +78,7 @@ def backup_keyword_entries(
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")
         info = ydl.extract_info(
-            f"https://www.youtube.com/results?search_query={keyword}&sp=CAISBggEEAEYAQ%253D%253D",
+            f"https://www.youtube.com/results?search_query=\"{keyword}\"&sp=CAISBggEEAEYAQ%253D%253D",
             download=False,
         )
 
@@ -116,7 +116,7 @@ def backup_keyword_entries(
                 "format": "18",
                 "extractor_args": {
                     "youtube": {
-                        "player_client": ["web", "web_embedded"],
+                        "player_client": ["tv_simply"],
                         "player_skip": ["configs", "initial_data"],
                         "skip": ["dash", "hls", "translated_subs", "subs"],
                     },
@@ -152,5 +152,7 @@ def backup_keyword_entries(
                 buf.close()
 
                 register_download(downloaded, orgs)
+
+            time.sleep(10)
 
     return latest_seen
