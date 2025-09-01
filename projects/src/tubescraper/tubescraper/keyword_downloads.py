@@ -66,6 +66,7 @@ def backup_keyword_entries(
         "logtostderr": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "lazy_playlist": True,
+        "playlist_items": "1:100",
         "match_filter": match_filter_func(["media_type=short"], None),
         "extractor_args": {
             "youtube": {
