@@ -12,7 +12,6 @@ from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.hardcoded_channels import OrgName
 from tubescraper.register import register_download
 from yt_dlp import DownloadError, ImpersonateTarget
-from yt_dlp.utils import match_filter_func
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -61,19 +60,19 @@ def backup_keyword_entries(
 
     opts = {
         # "dateafter": cursor.date(),
+        "retries": 10,
+        "sleep_interval": 5.0,
+        "max_sleep_interval": 5.0,
+        "sleep_interval_requests": 0.75,
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "lazy_playlist": True,
-        "playlist_items": "1:100",
-        "match_filter": match_filter_func(["media_type=short"], None),
+        # "playlist_items": "1:100",
+        # "match_filter": match_filter_func(["media_type=short"], None),
+        "extract_flat": True,
         "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "web_embedded"],
-                "player_skip": ["configs", "initial_data"],
-                "skip": ["dash", "hls", "translated_subs", "subs"],
-            },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
     }
@@ -99,7 +98,7 @@ def backup_keyword_entries(
                 log.debug("entry is none, continuing...")
                 continue
 
-            if entry.get("media_type") != "short":
+            if "/shorts/" not in entry.get("url", ""):
                 log.debug("ignoring non-short entry, continuing...")
                 continue
 
@@ -138,6 +137,7 @@ def backup_keyword_entries(
                         "non-download error with shorts scraping?, skipping", exc_info=ex
                     )
                     continue
+
             log.debug(f"video buffered. buffer size: {buf.tell()}")
             buf.seek(0)
 
@@ -146,10 +146,8 @@ def backup_keyword_entries(
             log.bind(blob_path=blob_path)
             log.debug(f"uploading blob to path {blob_path}")
             bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+            buf.close()
 
             register_download(entry, orgs)
 
-            upload_date = datetime.strptime(entry["upload_date"], "%Y%m%d")
-            upload_date_utc = upload_date.replace(tzinfo=timezone.utc)
-            latest_seen = max(latest_seen, upload_date_utc)
     return latest_seen

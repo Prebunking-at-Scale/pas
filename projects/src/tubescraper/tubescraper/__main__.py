@@ -1,9 +1,10 @@
+import random
+
 from dotenv import load_dotenv
 
 _ = load_dotenv()
 
 
-import gc
 import logging
 import os
 import tempfile
@@ -74,7 +75,12 @@ def channels_downloader(storage_bucket: Bucket) -> None:
 def keywords_downloader(storage_bucket: Bucket) -> None:
     log = logger.bind()
     keywords: dict[str, list[OrgName]] = preprocess_keywords(org_keywords)
-    for keyword, orgs in keywords.items():
+
+    # Process keywords in a random order to avoid always fetching the same keywords during
+    # testing
+    r = [(k, v) for k, v in keywords.items()]
+    random.shuffle(r)
+    for keyword, orgs in r:
         _ = bind_contextvars(keyword=keyword)
         log.info(f"archiving a new keyword: {keyword}")
 
@@ -82,9 +88,6 @@ def keywords_downloader(storage_bucket: Bucket) -> None:
         existing = download_existing_ids_for_keyword(storage_bucket, keyword)
         new_cursor = backup_keyword_entries(storage_bucket, keyword, cursor, existing, orgs)
         backup_cursor(storage_bucket, keyword, new_cursor)
-
-        # maybe fix memory leak?
-        _ = gc.collect()
 
 
 if __name__ == "__main__":
