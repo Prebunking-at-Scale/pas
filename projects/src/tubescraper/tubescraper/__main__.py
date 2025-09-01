@@ -95,5 +95,5 @@ if __name__ == "__main__":
     storage_bucket = storage_client.bucket(STORAGE_BUCKET_NAME)
     log.debug("buckets configured")
 
-    channels_downloader(storage_bucket)
+    # channels_downloader(storage_bucket)
     keywords_downloader(storage_bucket)

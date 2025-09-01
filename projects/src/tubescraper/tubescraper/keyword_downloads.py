@@ -8,9 +8,11 @@ from pathlib import Path
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
+from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.hardcoded_channels import OrgName
 from tubescraper.register import register_download
 from yt_dlp import DownloadError, ImpersonateTarget
+from yt_dlp.utils import match_filter_func
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -58,15 +60,29 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        "dateafter": cursor.date(),
+        # "dateafter": cursor.date(),
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        "lazy_playlist": True,
+        "match_filter": match_filter_func(["media_type=short"], None),
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web", "web_embedded"],
+                "player_skip": ["configs", "initial_data"],
+                "skip": ["dash", "hls", "translated_subs", "subs"],
+            },
+            "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+        },
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")
-        info = ydl.extract_info(f"ytsearchdate100:{keyword}", download=False)
+        info = ydl.extract_info(
+            f"https://www.youtube.com/results?search_query={keyword}&sp=CAISBggEEAEYAQ%253D%253D",
+            download=False,
+        )
+
         if not info:
             raise yt_dlp.utils.DownloadError("Empty info dict")
 
@@ -99,6 +115,14 @@ def backup_keyword_entries(
                 "outtmpl": "-",
                 "logtostderr": True,
                 "format": "18",
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["web", "web_embedded"],
+                        "player_skip": ["configs", "initial_data"],
+                        "skip": ["dash", "hls", "translated_subs", "subs"],
+                    },
+                    "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+                },
             }
             buf = io.BytesIO()
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
