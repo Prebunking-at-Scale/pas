@@ -69,7 +69,6 @@ def backup_keyword_entries(
         "logtostderr": True,
         "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
         "lazy_playlist": True,
-        # "playlist_items": "1:100",
         # "match_filter": match_filter_func(["media_type=short"], None),
         "extract_flat": True,
         "extractor_args": {
@@ -128,7 +127,7 @@ def backup_keyword_entries(
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
                 log.debug(f"downloading to buffer {id(buf)}")
                 try:
-                    video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                    downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
                 except DownloadError as ex:
                     log.error("yt_dlp download error, skipping", exc_info=ex)
                     continue
@@ -138,16 +137,20 @@ def backup_keyword_entries(
                     )
                     continue
 
-            log.debug(f"video buffered. buffer size: {buf.tell()}")
-            buf.seek(0)
+                log.debug(f"video buffered. buffer size: {buf.tell()}")
+                buf.seek(0)
 
-            blob_path = prefix_path + str(entry["id"])
+                if not downloaded:
+                    log.debug("downloaded is none, continuing...")
+                    continue
 
-            log.bind(blob_path=blob_path)
-            log.debug(f"uploading blob to path {blob_path}")
-            bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
-            buf.close()
+                blob_path = prefix_path + str(downloaded["id"])
 
-            register_download(entry, orgs)
+                log.bind(blob_path=blob_path)
+                log.debug(f"uploading blob to path {blob_path}")
+                bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+                buf.close()
+
+                register_download(downloaded, orgs)
 
     return latest_seen
