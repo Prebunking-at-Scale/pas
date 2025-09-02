@@ -3,7 +3,6 @@ import io
 import json
 import os
 import random
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -162,7 +161,5 @@ def backup_keyword_entries(
                 buf.close()
 
                 register_download(downloaded, orgs)
-
-            time.sleep(10)
 
     return latest_seen
