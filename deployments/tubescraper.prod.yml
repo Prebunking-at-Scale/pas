@@ -60,3 +60,5 @@ spec:
                     secretKeyRef:
                       name: proxy-credentials
                       key: password
+                - name: PROXY_COUNT
+                  value: "20"

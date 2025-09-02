@@ -2,9 +2,10 @@ import contextlib
 import io
 import json
 import os
+import random
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import time
 
 import structlog
 import yt_dlp
@@ -19,9 +20,16 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
+PROXY_COUNT = int(os.environ["PROXY_COUNT"])
 PROXY_USERNAME = os.environ["PROXY_USERNAME"]
 PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper/keywords")
+
+
+def proxy_addr() -> str:
+    proxy_id = random.randrange(1, PROXY_COUNT, 1)
+    logger.debug(f"using proxy id {proxy_id}")
+    return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
 def download_cursor(bucket: Bucket, keyword: str) -> datetime:
@@ -68,7 +76,7 @@ def backup_keyword_entries(
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
-        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        "proxy": proxy_addr(),
         "lazy_playlist": True,
         "extract_flat": True,
         "extractor_args": {
@@ -78,7 +86,7 @@ def backup_keyword_entries(
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")
         info = ydl.extract_info(
-            f"https://www.youtube.com/results?search_query=\"{keyword}\"&sp=CAISBggEEAEYAQ%253D%253D",
+            f'https://www.youtube.com/results?search_query="{keyword}"&sp=CAISBggEEAEYAQ%253D%253D',
             download=False,
         )
 
@@ -90,9 +98,10 @@ def backup_keyword_entries(
             raise yt_dlp.utils.DownloadError("No or malformed entries")
 
         log.debug(f"{len(entries)} entries found. iterating...")
-        for entry in entries:
+        for i, entry in enumerate(entries):
             log.bind(entry=entry)
 
+            log.info(f"processing {i} of {len(entries)} for keyword {keyword}...")
             if not entry:
                 log.debug("entry is none, continuing...")
                 continue
@@ -114,6 +123,7 @@ def backup_keyword_entries(
                 "outtmpl": "-",
                 "logtostderr": True,
                 "format": "18",
+                "proxy": proxy_addr(),
                 "extractor_args": {
                     "youtube": {
                         "player_client": ["tv_simply"],
