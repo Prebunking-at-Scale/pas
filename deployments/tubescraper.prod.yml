@@ -30,10 +30,10 @@ spec:
               resources:
                 limits:
                   cpu: 2
-                  memory: 8G
+                  memory: 1G
                 requests:
                   cpu: 1
-                  memory: 2G
+                  memory: 0.5G
               env:
                 - name: STORAGE_BUCKET_NAME
                   value: "pas-production-storage"

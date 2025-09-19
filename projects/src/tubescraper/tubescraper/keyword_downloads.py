@@ -67,7 +67,7 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        # "dateafter": cursor.date(),
+        "dateafter": cursor.date(),
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
@@ -85,6 +85,8 @@ def backup_keyword_entries(
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {keyword} to {prefix_path}")
         info = ydl.extract_info(
+            # the sp parameter is a pre-computed search query that gives
+            # videos of length under 4 minutes, sorted by most recent.
             f'https://www.youtube.com/results?search_query="{keyword}"&sp=CAISBggEEAEYAQ%253D%253D',
             download=False,
         )
