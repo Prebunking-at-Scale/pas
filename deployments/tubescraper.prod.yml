@@ -61,4 +61,4 @@ spec:
                       name: proxy-credentials
                       key: password
                 - name: PROXY_COUNT
-                  value: "20"
+                  value: "50"
