@@ -3,10 +3,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import requests
 import structlog
-from tubescraper.hardcoded_channels import OrgName
+from tubescraper.types import CORE_API, Cursor
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -29,19 +30,7 @@ def check_entry_exists(video_id: str) -> bool:
     return False
 
 
-def register_downloads(
-    info: dict[str, Any],
-    orgs: list[OrgName],
-) -> None:
-    log = logger.bind()
-
-    entries = info.get("entries", [])
-    log.debug(f"registering {len(entries)} videos with API")
-    for entry in entries:
-        register_download(entry, orgs)
-
-
-def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
+def register_download(entry: dict[Any, Any], org_id: UUID) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
@@ -90,7 +79,7 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {
-            "for_organisation": orgs,
+            "for_organisation": [org_id],
             "youtube_id": entry_id,
         },
     }
@@ -108,3 +97,37 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
             exc_info=ex,
             entry=entry,
         )
+
+
+def fetch_cursor(target: str, platform: str) -> datetime:
+    """Fetches the current cursor for a given channel and platform from the core API.
+
+    Args:
+        target (str): The channel identifier.
+        platform (str): The platform name, e.g., "youtube".
+
+    Returns:
+        datetime: The cursor timestamp for the given channel and platform.
+
+    """
+    with requests.get(f"{CORE_API}/cursors/{target}/{platform}") as resp:
+        resp.raise_for_status()
+        cursor = Cursor(**resp.json())
+        cursor_date = str(cursor.cursor)
+        return datetime.fromisoformat(cursor_date)
+
+
+def update_cursor(target: str, platform: str, dt: datetime) -> None:
+    """Updates the stored cursor for a given channel and platform in the core API.
+
+    Args:
+        target (str): The channel identifier.
+        platform (str): The platform name, e.g., "youtube".
+        dt (datetime): The new cursor timestamp to store.
+
+    """
+    with requests.post(
+        url=f"{CORE_API}/cursors/{target}/{platform}", json=dt.isoformat()
+    ) as resp:
+        resp.raise_for_status()
+    return

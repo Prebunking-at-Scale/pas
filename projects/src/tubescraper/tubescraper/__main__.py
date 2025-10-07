@@ -1,6 +1,8 @@
 import random
 
 from dotenv import load_dotenv
+from tubescraper.register import fetch_cursor
+from tubescraper.types import ChannelFeed, KeywordFeed
 
 _ = load_dotenv()
 
@@ -15,19 +17,14 @@ from google.cloud.storage import Client as StorageClient
 from pas_log import pas_setup_structlog
 from structlog.contextvars import bind_contextvars
 from tubescraper.channel_downloads import (
-    backup_archivefile,
-    download_archivefile,
+    channel_download_hook,
     download_channel,
-    fix_archivefile,
+    fetch_channel_feeds,
     id_for_channel,
 )
-from tubescraper.hardcoded_channels import OrgName, channels, preprocess_channels
-from tubescraper.hardcoded_keywords import org_keywords, preprocess_keywords
 from tubescraper.keyword_downloads import (
-    backup_cursor,
     backup_keyword_entries,
-    download_cursor,
-    download_existing_ids_for_keyword,
+    fetch_keyword_feeds,
 )
 
 log_level = pas_setup_structlog()
@@ -38,56 +35,43 @@ STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 """The bucket where tubescraper will store all it's output."""
 
 
-def channels_downloader(storage_bucket: Bucket) -> None:
+def channels_downloader(channels: list[ChannelFeed], storage_bucket: Bucket) -> None:
     log = logger.bind()
-    channel_map = preprocess_channels(channels)
-    for channel_source, orgs in channel_map.items():
+    for channel in channels:
+        if channel.platform != "youtube":
+            continue
+
+        channel_source = channel.channel
         _ = bind_contextvars(channel_source=channel_source)
         log.info(f"archiving a new channel: {channel_source}")
 
         with tempfile.TemporaryDirectory() as download_directory:
             log.debug("downloading to temporary directory")
-            archivefile: str = f"{channel_source}_state"
             try:
+                hook = channel_download_hook(storage_bucket, channel.organisation_id)
                 channel_id = id_for_channel(channel_source)
-
-                download_archivefile(storage_bucket, archivefile)
-                # XXX: please remove this when archives exist or we do it via api
-                fix_archivefile(storage_bucket, archivefile, channel_id)
-
-                info = download_channel(
-                    channel_id,
-                    download_directory,
-                    archivefile,
-                    storage_bucket,
-                    orgs,
-                )
+                cursor_dt = fetch_cursor(channel_id, channel.platform)
+                info = download_channel(channel_id, download_directory, cursor_dt, hook)
                 if not info:
                     log.error("no info, skipping channel backup")
                     continue
-
-                backup_archivefile(storage_bucket, archivefile)
             except ValueError as exc:
                 log.error("Error with channel {channel_source}", exc_info=exc)
                 continue
 
 
-def keywords_downloader(storage_bucket: Bucket) -> None:
+def keywords_downloader(keyword_feeds: list[KeywordFeed], storage_bucket: Bucket) -> None:
     log = logger.bind()
-    keywords: dict[str, list[OrgName]] = preprocess_keywords(org_keywords)
 
-    # Process keywords in a random order to avoid always fetching the same keywords during
-    # testing
-    r = [(k, v) for k, v in keywords.items()]
-    random.shuffle(r)
-    for keyword, orgs in r:
-        _ = bind_contextvars(keyword=keyword)
-        log.info(f"archiving a new keyword: {keyword}")
+    # Process keywords in a random order to avoid always scraping the same ones
+    random.shuffle(keyword_feeds)
+    for feed in keyword_feeds:
+        for keyword in feed.keywords:
+            _ = bind_contextvars(keyword=keyword)
+            log.info(f"archiving a new keyword: {keyword}")
 
-        cursor = download_cursor(storage_bucket, keyword)
-        existing = download_existing_ids_for_keyword(storage_bucket, keyword)
-        new_cursor = backup_keyword_entries(storage_bucket, keyword, cursor, existing, orgs)
-        backup_cursor(storage_bucket, keyword, new_cursor)
+            cursor_dt = fetch_cursor(keyword, "youtube")
+            backup_keyword_entries(storage_bucket, keyword, cursor_dt, feed.organisation_id)
 
 
 if __name__ == "__main__":
@@ -98,5 +82,8 @@ if __name__ == "__main__":
     storage_bucket = storage_client.bucket(STORAGE_BUCKET_NAME)
     log.debug("buckets configured")
 
-    # channels_downloader(storage_bucket)
-    keywords_downloader(storage_bucket)
+    channels = fetch_channel_feeds()
+    channels_downloader(channels, storage_bucket)
+
+    keywords = fetch_keyword_feeds()
+    keywords_downloader(keywords, storage_bucket)

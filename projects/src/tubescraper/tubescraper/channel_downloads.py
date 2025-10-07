@@ -1,14 +1,16 @@
 import mimetypes
 import os
-from pathlib import Path, PurePath
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
+from uuid import UUID
 
+import requests
 import structlog
 import yt_dlp
-import yt_dlp.utils
 from google.cloud.storage import Bucket
-from tubescraper.hardcoded_channels import OrgName
-from tubescraper.register import register_download
+from tubescraper.register import register_download, update_cursor
+from tubescraper.types import CORE_API, ChannelFeed
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.utils import DownloadError, RejectedVideoReached
 
@@ -46,46 +48,47 @@ def id_for_channel(s: str) -> str:
 def download_channel(
     channel_id: str,
     output_directory: str,
-    archivefile: str,
-    bucket: Bucket,
-    orgs: list[OrgName],
+    cursor: datetime,
+    download_hook: Callable[[dict[Any, Any]], None],
 ) -> dict[Any, Any] | None:
     """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
 
     This function connects to YouTube and downloads Shorts content from the specified
-    channel.  It uses a download archive to avoid re-downloading already processed
+    channel.  It uses a datetime cursor to avoid re-downloading already processed
     content. Video and subtitle options are configured to ensure consistent output and
     error resilience.  It extracts both manual and auto-generated subtitles. Translated
     subtitles are skipped via extractor arguments.
 
     Args:
-        channel_name (str):
-            The custom URL name of the YouTube channel (e.g., '@ChannelName').
+        channel_id (str):
+            The YouTube channel ID
         output_directory (str):
             The directory path where downloaded files will be saved.
-        archivefile (str):
-            The file path to the download archive used to track downloaded content.
-            Archive will be created if it does not exist.
+        bucket (Bucket):
+            The bucket instance for storage operations.
+        cursor (datetime):
+            The datetime threshold for filtering content. Only videos uploaded after
+            this date will be downloaded.
+        download_hook (Callable[[dict[Any, Any]], None]):
+            A callback function that receives download progress information from yt_dlp.
 
-    Raises:
-        DownloadError:
-            Some yt-dlp specific error downloading from YouTube.
-        Exception:
-            If the extracted info from YouTube is not a dictionary, indicating a potential failure in retrieving
-            channel data.
+    Returns:
+        dict[Any, Any] | None:
+            A dictionary containing the extracted video information if successful,
+            or None if no videos were found or if download was rejected/failed.
 
     """
     log = logger.bind()
 
     opts = {
-        "download_archive": archivefile,
         "fragment_retries": 10,
-        "daterange": yt_dlp.utils.DateRange("today-1month", "today"),  # type: ignore
+        "playlistreverse": True,  # for cursor
+        "dateafter": cursor.date(),
         "break_on_reject": True,
         "outtmpl": {
             "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
         },
-        "progress_hooks": [progress_hook_register(bucket, orgs)],
+        "progress_hooks": [download_hook],
         "postprocessors": [
             {"key": "FFmpegConcat", "only_multi_video": True, "when": "playlist"}
         ],
@@ -131,69 +134,12 @@ def download_channel(
             log.error("non-download error with shorts scraping?", exc_info=ex)
 
 
-def progress_hook_register(
-    bucket: Bucket, orgs: list[OrgName]
-) -> Callable[[dict[str, Any]], None]:
-    def hook(d: dict[Any, Any]) -> None:
-        if d["status"] == "finished":
-            if backup_youtube_video(bucket, d["info_dict"]):
-                register_download(d["info_dict"], orgs)
-
-    return hook
-
-
-def fix_archivefile(bucket: Bucket, archivefile: str, channel_id: str) -> None:
-    """
-    Ensure the yt-dlp archive file exists. If missing, reconstruct it by
-    listing objects in the given bucket under the channel prefix and writing
-    video IDs in yt-dlp archive format.
-    """
-    log = logger.bind(archive_file=archivefile, channel_id=channel_id)
-
-    if os.path.exists(archivefile):
-        log.info("Archive file already exists, skipping build")
-        return
-
-    log.info("Building archive file from bucket contents")
-    prefix_path = str(STORAGE_PATH_PREFIX / channel_id) + "/"
-    filenames = [PurePath(blob.name).name for blob in bucket.list_blobs(prefix=prefix_path)]
-    log.debug("Collected filenames from bucket", count=len(filenames))
-
-    with open(archivefile, "w") as fh:
-        for filename in filenames:
-            video_id, *_ = filename.split(".")
-            fh.write(f"youtube {video_id}\n")
-
-    log.info("Archive file successfully built", entries=len(filenames))
-    return
-
-
-def download_archivefile(bucket: Bucket, archivefile: str) -> None:
-    """Downloads a yt_dlp archive file from GCS if it exists.
-
-    Args:
-        bucket (Bucket): The GCS bucket to download from.
-        path (Path): Local path to save the archive file.
-    """
-    log = logger.bind(archive_file=archivefile)
-
-    archive_path = str(STORAGE_PATH_PREFIX / archivefile)
-    archive_blob = bucket.get_blob(archive_path)
-    if (archive_blob and not archive_blob.exists()) or not archive_blob:
-        log.debug(f"no archive for channel at {archivefile}")
-        return
-
-    log.debug(f"downloading archive from {archive_path}")
-    archive_blob.download_to_filename(filename=archivefile)
-
-
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     """Uploads downloaded files from a channel to Google Cloud Storage.
 
     Args:
         bucket (Bucket): GCS bucket to upload to.
-        channel_name (str): Name of the YouTube channel for path organisation.
-        source_directory (str): Local directory containing files to upload.
+        info (dict): yt-dlp's info dict output.
     """
     channel_id = info.get("channel_id", "unknown")
     filename = info.get("filename")
@@ -225,13 +171,40 @@ def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     return True
 
 
-def backup_archivefile(bucket: Bucket, archivefile: str) -> None:
-    """Uploads a download archive file to Google Cloud Storage."""
-    logger.debug("backing up archive to storage bucket", archive_file=archivefile)
+def fetch_channel_feeds() -> list[ChannelFeed]:
+    """Fetches channel feed data from the core API.
 
-    if not os.path.exists(archivefile):
-        return
+    Returns:
+        list[ChannelFeed]:
+            A list of ChannelFeed objects parsed from the API response.
 
-    backup_path = str(STORAGE_PATH_PREFIX / archivefile)
-    blob = bucket.blob(backup_path)
-    blob.upload_from_filename(archivefile)
+    """
+    with requests.get(f"{CORE_API}/media-feeds/channels") as resp:
+        resp.raise_for_status()
+        print(resp.json())
+        return [ChannelFeed(**feed) for feed in resp.json()]
+
+
+def channel_download_hook(bucket: Bucket, org_id: UUID) -> Callable[..., Any]:
+    """Creates a yt_dlp download hook that uploads finished videos to storage and updates cursors.
+
+    Args:
+        bucket (Bucket): The Google Cloud Storage bucket for uploads.
+        org_id (UUID): The organisation ID the channel was downloaded for.
+
+    Returns:
+        Callable[..., Any]: A function suitable for use as a yt_dlp progress hook.
+
+    """
+
+    def hook(d: dict[Any, Any]) -> None:
+        if d.get("status") == "finished":
+            status = backup_youtube_video(bucket, d["info_dict"])
+            if status:
+                register_download(d["info_dict"], org_id)
+
+                timestamp = d["info_dict"]["timestamp"]
+                dt = datetime.fromtimestamp(timestamp)
+                update_cursor(d["info_dict"]["channel_id"], "youtube", dt)
+
+    return hook

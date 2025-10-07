@@ -3,15 +3,17 @@ import io
 import json
 import os
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
+import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
-from tubescraper.hardcoded_channels import OrgName
-from tubescraper.register import register_download
+from tubescraper.register import register_download, update_cursor
+from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -31,33 +33,9 @@ def proxy_addr() -> str:
     return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
-def download_cursor(bucket: Bucket, keyword: str) -> datetime:
-    cursor_path = str(STORAGE_PATH_PREFIX / keyword / "cursor")
-    cursor_blob = bucket.blob(cursor_path)
-    if not cursor_blob.exists():
-        return datetime.now(timezone.utc) - timedelta(days=1)
-    cursor = cursor_blob.download_as_text()
-    return datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-
-
-def backup_cursor(bucket: Bucket, keyword: str, cursor: datetime):
-    cursor_path = str(STORAGE_PATH_PREFIX / keyword / "cursor")
-    cursor_blob = bucket.blob(cursor_path)
-    cursor_blob.upload_from_string(cursor.isoformat())
-
-
-def download_existing_ids_for_keyword(bucket: Bucket, keyword: str) -> set[str]:
-    prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
-    return {Path(blob.name).stem for blob in bucket.list_blobs(prefix=prefix_path)}
-
-
 def backup_keyword_entries(
-    bucket: Bucket,
-    keyword: str,
-    cursor: datetime,
-    existing: set[str],
-    orgs: list[OrgName],
-) -> datetime:
+    bucket: Bucket, keyword: str, cursor: datetime, org_id: UUID
+) -> None:
     log = logger.new()
 
     # returns list[object] because yt_dlp types are really inconsistent across extractors
@@ -67,6 +45,7 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
+        "playlistreverse": True,
         "dateafter": cursor.date(),
         "retries": 10,
         "sleep_interval": 10.0,
@@ -109,10 +88,6 @@ def backup_keyword_entries(
 
             if "/shorts/" not in entry.get("url", ""):
                 log.debug("ignoring non-short entry, continuing...")
-                continue
-
-            if entry["id"] in existing:
-                log.debug("entry exists, continuing...")
                 continue
 
             # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
@@ -162,6 +137,13 @@ def backup_keyword_entries(
                 bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
                 buf.close()
 
-                register_download(downloaded, orgs)
+                register_download(downloaded, org_id)
+                timestamp = entry.get("timestamp")
+                dt = datetime.fromtimestamp(timestamp)
+                update_cursor(keyword, "youtube", dt)
 
-    return latest_seen
+
+def fetch_keyword_feeds() -> list[KeywordFeed]:
+    with requests.get(f"{CORE_API}/media-feeds/keywords") as resp:
+        resp.raise_for_status()
+        return [KeywordFeed(**feed) for feed in resp.json()]
