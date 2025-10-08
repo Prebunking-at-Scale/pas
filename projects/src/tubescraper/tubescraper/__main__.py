@@ -1,4 +1,5 @@
 import random
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from tubescraper.register import fetch_cursor
@@ -51,6 +52,8 @@ def channels_downloader(channels: list[ChannelFeed], storage_bucket: Bucket) -> 
                 hook = channel_download_hook(storage_bucket, channel.organisation_id)
                 channel_id = id_for_channel(channel_source)
                 cursor_dt = fetch_cursor(channel_id, channel.platform)
+                if not cursor_dt:
+                    cursor_dt = datetime.now() - timedelta(days=31)
                 info = download_channel(channel_id, download_directory, cursor_dt, hook)
                 if not info:
                     log.error("no info, skipping channel backup")

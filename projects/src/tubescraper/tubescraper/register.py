@@ -7,6 +7,7 @@ from uuid import UUID
 
 import requests
 import structlog
+from requests.exceptions import HTTPError
 from tubescraper.types import CORE_API, Cursor
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -99,7 +100,7 @@ def register_download(entry: dict[Any, Any], org_id: UUID) -> None:
         )
 
 
-def fetch_cursor(target: str, platform: str) -> datetime:
+def fetch_cursor(target: str, platform: str) -> datetime | None:
     """Fetches the current cursor for a given channel and platform from the core API.
 
     Args:
@@ -108,13 +109,19 @@ def fetch_cursor(target: str, platform: str) -> datetime:
 
     Returns:
         datetime: The cursor timestamp for the given channel and platform.
+        None: No cursor exists for this channel/platform.
 
     """
-    with requests.get(f"{CORE_API}/cursors/{target}/{platform}") as resp:
-        resp.raise_for_status()
-        cursor = Cursor(**resp.json())
-        cursor_date = str(cursor.cursor)
-        return datetime.fromisoformat(cursor_date)
+    try:
+        with requests.get(f"{CORE_API}/cursors/{target}/{platform}") as resp:
+            resp.raise_for_status()
+            cursor = Cursor(**resp.json())
+            cursor_date = str(cursor.cursor)
+            return datetime.fromisoformat(cursor_date)
+    except HTTPError as ex:
+        if ex.response.status_code == 404:
+            return None
+        raise ex
 
 
 def update_cursor(target: str, platform: str, dt: datetime) -> None:
