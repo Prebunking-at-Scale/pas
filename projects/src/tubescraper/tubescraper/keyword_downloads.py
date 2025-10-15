@@ -1,6 +1,5 @@
 import contextlib
 import io
-import json
 import os
 import random
 from datetime import datetime
@@ -12,15 +11,12 @@ import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
-from tubescraper.register import register_download, update_cursor
+from tubescraper.register import API_KEY, register_download, update_cursor
 from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
-API_URL = os.environ["API_URL"]
-API_KEYS = os.environ["API_KEYS"]
-API_KEY = json.loads(API_KEYS).pop()
 PROXY_COUNT = int(os.environ["PROXY_COUNT"])
 PROXY_USERNAME = os.environ["PROXY_USERNAME"]
 PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
@@ -34,7 +30,10 @@ def proxy_addr() -> str:
 
 
 def backup_keyword_entries(
-    bucket: Bucket, keyword: str, cursor: datetime, org_id: UUID
+    bucket: Bucket,
+    keyword: str,
+    cursor: datetime,
+    org_ids: list[UUID],
 ) -> None:
     log = logger.new()
 
@@ -110,7 +109,7 @@ def backup_keyword_entries(
                 },
             }
             buf = io.BytesIO()
-            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
+            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
                 log.debug(f"downloading to buffer {id(buf)}")
                 try:
                     downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
@@ -137,13 +136,32 @@ def backup_keyword_entries(
                 bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
                 buf.close()
 
-                register_download(downloaded, org_id)
+                register_download(downloaded, org_ids)
                 timestamp = entry.get("timestamp")
                 dt = datetime.fromtimestamp(timestamp)
-                update_cursor(keyword, "youtube", dt)
+                update_cursor(keyword, dt)
 
 
 def fetch_keyword_feeds() -> list[KeywordFeed]:
-    with requests.get(f"{CORE_API}/media-feeds/keywords") as resp:
+    with requests.get(
+        f"{CORE_API}/media_feeds/keywords",
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
         resp.raise_for_status()
-        return [KeywordFeed(**feed) for feed in resp.json()]
+        data = resp.json()["data"]
+        return [KeywordFeed(**feed) for feed in data]
+
+
+type KeywordResults = dict[str, list[UUID]]
+
+
+def preprocess_keyword_feeds(feeds: list[KeywordFeed]) -> KeywordResults:
+    """Deduplicates organisation ids from the feeds. We should probably do this in the
+    api.
+    """
+    result: KeywordResults = {}
+    for feed in feeds:
+        for keyword in feed.keywords:
+            result[keyword] = result.get(keyword, []) + [feed.organisation_id]
+
+    return result

@@ -31,7 +31,7 @@ def check_entry_exists(video_id: str) -> bool:
     return False
 
 
-def register_download(entry: dict[Any, Any], org_id: UUID) -> None:
+def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
@@ -80,7 +80,7 @@ def register_download(entry: dict[Any, Any], org_id: UUID) -> None:
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {
-            "for_organisation": [org_id],
+            "for_organisation": org_ids,
             "youtube_id": entry_id,
         },
     }
@@ -100,7 +100,7 @@ def register_download(entry: dict[Any, Any], org_id: UUID) -> None:
         )
 
 
-def fetch_cursor(target: str, platform: str) -> datetime | None:
+def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
     """Fetches the current cursor for a given channel and platform from the core API.
 
     Args:
@@ -113,7 +113,10 @@ def fetch_cursor(target: str, platform: str) -> datetime | None:
 
     """
     try:
-        with requests.get(f"{CORE_API}/cursors/{target}/{platform}") as resp:
+        with requests.get(
+            f"{CORE_API}/cursors/{target}/{platform}",
+            headers={"X-API-TOKEN": API_KEY},
+        ) as resp:
             resp.raise_for_status()
             cursor = Cursor(**resp.json())
             cursor_date = str(cursor.cursor)
@@ -124,7 +127,7 @@ def fetch_cursor(target: str, platform: str) -> datetime | None:
         raise ex
 
 
-def update_cursor(target: str, platform: str, dt: datetime) -> None:
+def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
     """Updates the stored cursor for a given channel and platform in the core API.
 
     Args:
@@ -134,7 +137,9 @@ def update_cursor(target: str, platform: str, dt: datetime) -> None:
 
     """
     with requests.post(
-        url=f"{CORE_API}/cursors/{target}/{platform}", json=dt.isoformat()
+        url=f"{CORE_API}/cursors/{target}/{platform}",
+        json=dt.isoformat(),
+        headers={"X-API-TOKEN": API_KEY},
     ) as resp:
         resp.raise_for_status()
     return

@@ -22,10 +22,12 @@ from tubescraper.channel_downloads import (
     download_channel,
     fetch_channel_feeds,
     id_for_channel,
+    preprocess_channel_feeds,
 )
 from tubescraper.keyword_downloads import (
     backup_keyword_entries,
     fetch_keyword_feeds,
+    preprocess_keyword_feeds,
 )
 
 log_level = pas_setup_structlog()
@@ -36,24 +38,21 @@ STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 """The bucket where tubescraper will store all it's output."""
 
 
-def channels_downloader(channels: list[ChannelFeed], storage_bucket: Bucket) -> None:
+def channels_downloader(channel_feeds: list[ChannelFeed], storage_bucket: Bucket) -> None:
     log = logger.bind()
-    for channel in channels:
-        if channel.platform != "youtube":
-            continue
-
-        channel_source = channel.channel
-        _ = bind_contextvars(channel_source=channel_source)
-        log.info(f"archiving a new channel: {channel_source}")
+    channels = preprocess_channel_feeds(channel_feeds)
+    for channel, orgs in channels.items():
+        _ = bind_contextvars(channel_name=channel)
+        log.info(f"archiving a new channel: {channel}")
 
         with tempfile.TemporaryDirectory() as download_directory:
             log.debug("downloading to temporary directory")
             try:
-                hook = channel_download_hook(storage_bucket, channel.organisation_id)
-                channel_id = id_for_channel(channel_source)
-                cursor_dt = fetch_cursor(channel_id, channel.platform)
+                hook = channel_download_hook(storage_bucket, orgs)
+                channel_id = id_for_channel(channel)
+                cursor_dt = fetch_cursor(channel_id)
                 if not cursor_dt:
-                    cursor_dt = datetime.now() - timedelta(days=31)
+                    cursor_dt = datetime.now() - timedelta(days=14)
                 info = download_channel(channel_id, download_directory, cursor_dt, hook)
                 if not info:
                     log.error("no info, skipping channel backup")
@@ -66,15 +65,21 @@ def channels_downloader(channels: list[ChannelFeed], storage_bucket: Bucket) -> 
 def keywords_downloader(keyword_feeds: list[KeywordFeed], storage_bucket: Bucket) -> None:
     log = logger.bind()
 
+    processed_keywords = preprocess_keyword_feeds(keyword_feeds)
     # Process keywords in a random order to avoid always scraping the same ones
-    random.shuffle(keyword_feeds)
-    for feed in keyword_feeds:
-        for keyword in feed.keywords:
-            _ = bind_contextvars(keyword=keyword)
-            log.info(f"archiving a new keyword: {keyword}")
+    keywords = list(processed_keywords.keys())
+    random.shuffle(keywords)
 
-            cursor_dt = fetch_cursor(keyword, "youtube")
-            backup_keyword_entries(storage_bucket, keyword, cursor_dt, feed.organisation_id)
+    for keyword in keywords:
+        org_ids = processed_keywords[keyword]
+
+        _ = bind_contextvars(keyword=keyword)
+        log.info(f"archiving a new keyword: {keyword}")
+
+        cursor_dt = fetch_cursor(keyword)
+        if not cursor_dt:
+            cursor_dt = datetime.now() - timedelta(days=14)
+        backup_keyword_entries(storage_bucket, keyword, cursor_dt, org_ids)
 
 
 if __name__ == "__main__":

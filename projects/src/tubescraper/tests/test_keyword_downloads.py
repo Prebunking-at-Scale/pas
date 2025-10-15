@@ -5,49 +5,61 @@ from uuid import uuid4
 import pytest
 import requests
 import responses
-from tubescraper.keyword_downloads import fetch_keyword_feeds
+from tubescraper.keyword_downloads import fetch_keyword_feeds, preprocess_keyword_feeds
 from tubescraper.types import CORE_API, KeywordFeed
 
 
 @pytest.fixture
 def keyword_data():
-    org_id = str(uuid4())
-    return [
-        {
-            "id": str(uuid4()),
-            "organisation_id": org_id,
-            "topic": "sports",
-            "keywords": ["football", "basketball"],
-            "is_archived": False,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-        },
-        {
-            "id": str(uuid4()),
-            "organisation_id": org_id,
-            "topic": "music",
-            "keywords": ["rock", "jazz"],
-            "is_archived": True,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-        },
-        {
-            "id": str(uuid4()),
-            "organisation_id": org_id,
-            "topic": "tech",
-            "keywords": ["ai", "cloud"],
-            "is_archived": False,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-        },
-    ]
+    org_id_1 = str(uuid4())
+    org_id_2 = str(uuid4())
+    return {
+        "data": [
+            {
+                "id": str(uuid4()),
+                "organisation_id": org_id_1,
+                "topic": "sports",
+                "keywords": ["football", "basketball"],
+                "is_archived": False,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            },
+            {
+                "id": str(uuid4()),
+                "organisation_id": org_id_1,
+                "topic": "music",
+                "keywords": ["rock", "jazz"],
+                "is_archived": True,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            },
+            {
+                "id": str(uuid4()),
+                "organisation_id": org_id_1,
+                "topic": "tech",
+                "keywords": ["ai", "cloud"],
+                "is_archived": False,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            },
+            {
+                "id": str(uuid4()),
+                "organisation_id": org_id_2,
+                "topic": "tech",
+                "keywords": ["ai", "python"],
+                "is_archived": False,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            },
+        ]
+    }
 
 
 @responses.activate
-def test_keyword_fetch(keyword_data: list[dict[str, Any]]):
+def test_keyword_fetch(keyword_data: dict[str, Any]):
     _ = responses.add(
         responses.GET,
-        f"{CORE_API}/media-feeds/keywords",
+        f"{CORE_API}/media_feeds/keywords",
         json=keyword_data,
         status=200,
     )
@@ -64,13 +76,13 @@ def test_keyword_fetch(keyword_data: list[dict[str, Any]]):
 def test_keyword_fetch_empty():
     _ = responses.add(
         responses.GET,
-        f"{CORE_API}/media-feeds/keywords",
-        json=[],
+        f"{CORE_API}/media_feeds/keywords",
+        json={},
         status=200,
     )
 
-    feeds = fetch_keyword_feeds()
-    assert feeds == []
+    with pytest.raises(KeyError):
+        _ = fetch_keyword_feeds()
 
 
 @responses.activate
@@ -80,17 +92,36 @@ def test_keyword_fetch_raises_connection_error():
 
 
 @responses.activate
-def test_keyword_feed_validation(keyword_data: list[dict[str, Any]]):
+def test_keyword_feed_validation(keyword_data: dict[str, Any]):
     _ = responses.add(
         responses.GET,
-        f"{CORE_API}/media-feeds/keywords",
+        f"{CORE_API}/media_feeds/keywords",
         json=keyword_data,
         status=200,
     )
 
     feeds = fetch_keyword_feeds()
     sample = feeds[1]
-    expected = keyword_data[1]
+    expected = keyword_data["data"][1]
     assert sample.topic == expected["topic"]
     assert sample.keywords == expected["keywords"]
     assert sample.is_archived is True
+
+
+@responses.activate
+def test_keyword_feed_deduplication(keyword_data: dict[str, Any]):
+    _ = responses.add(
+        responses.GET,
+        f"{CORE_API}/media_feeds/keywords",
+        json=keyword_data,
+        status=200,
+    )
+
+    feeds = fetch_keyword_feeds()
+    result = preprocess_keyword_feeds(feeds)
+
+    # all keywords in result
+    for feed in feeds:
+        for keyword in feed.keywords:
+            assert keyword in result.keys()
+            assert feed.organisation_id in result[keyword]

@@ -1,5 +1,6 @@
 import mimetypes
 import os
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -9,7 +10,7 @@ import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-from tubescraper.register import register_download, update_cursor
+from tubescraper.register import API_KEY, register_download, update_cursor
 from tubescraper.types import CORE_API, ChannelFeed
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.utils import DownloadError, RejectedVideoReached
@@ -64,8 +65,6 @@ def download_channel(
             The YouTube channel ID
         output_directory (str):
             The directory path where downloaded files will be saved.
-        bucket (Bucket):
-            The bucket instance for storage operations.
         cursor (datetime):
             The datetime threshold for filtering content. Only videos uploaded after
             this date will be downloaded.
@@ -132,6 +131,7 @@ def download_channel(
             log.error("yt_dlp download error", exc_info=ex)
         except Exception as ex:
             log.error("non-download error with shorts scraping?", exc_info=ex)
+    return None
 
 
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
@@ -171,21 +171,7 @@ def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     return True
 
 
-def fetch_channel_feeds() -> list[ChannelFeed]:
-    """Fetches channel feed data from the core API.
-
-    Returns:
-        list[ChannelFeed]:
-            A list of ChannelFeed objects parsed from the API response.
-
-    """
-    with requests.get(f"{CORE_API}/media-feeds/channels") as resp:
-        resp.raise_for_status()
-        print(resp.json())
-        return [ChannelFeed(**feed) for feed in resp.json()]
-
-
-def channel_download_hook(bucket: Bucket, org_id: UUID) -> Callable[..., Any]:
+def channel_download_hook(bucket: Bucket, org_ids: list[UUID]) -> Callable[..., Any]:
     """Creates a yt_dlp download hook that uploads finished videos to storage and updates cursors.
 
     Args:
@@ -201,10 +187,40 @@ def channel_download_hook(bucket: Bucket, org_id: UUID) -> Callable[..., Any]:
         if d.get("status") == "finished":
             status = backup_youtube_video(bucket, d["info_dict"])
             if status:
-                register_download(d["info_dict"], org_id)
+                register_download(d["info_dict"], org_ids)
 
                 timestamp = d["info_dict"]["timestamp"]
                 dt = datetime.fromtimestamp(timestamp)
-                update_cursor(d["info_dict"]["channel_id"], "youtube", dt)
+                update_cursor(d["info_dict"]["channel_id"], dt)
 
     return hook
+
+
+def fetch_channel_feeds() -> list[ChannelFeed]:
+    """Fetches channel feed data from the core API.
+
+    Returns:
+        list[ChannelFeed]:
+            A list of ChannelFeed objects parsed from the API response.
+
+    """
+    with requests.get(
+        f"{CORE_API}/media_feeds/channels",
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
+        resp.raise_for_status()
+        data = resp.json()["data"]
+        return [ChannelFeed(**feed) for feed in data]
+
+
+type ChannelWatchers = dict[str, list[UUID]]
+
+
+def preprocess_channel_feeds(feeds: Iterable[ChannelFeed]) -> ChannelWatchers:
+    result: ChannelWatchers = {}
+    for feed in feeds:
+        if feed.platform != "youtube":
+            continue
+        result[feed.channel] = result.get(feed.channel, []) + [feed.organisation_id]
+
+    return result
