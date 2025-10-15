@@ -1,26 +1,27 @@
+import contextlib
+import io
 import mimetypes
 import os
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from uuid import UUID
 
 import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-from tubescraper.register import API_KEY, register_download, update_cursor
+from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
 from tubescraper.types import CORE_API, ChannelFeed
 from yt_dlp.networking.impersonate import ImpersonateTarget
-from yt_dlp.utils import DownloadError, RejectedVideoReached
+from yt_dlp.utils import DownloadError
+from yt_dlp.YoutubeDL import RejectedVideoReached
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 
 POT_PROVIDER_URL = os.environ["POT_PROVIDER_URL"]
-PROXY_USERNAME = os.environ["PROXY_USERNAME"]
-PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper")
 
 
@@ -46,92 +47,134 @@ def id_for_channel(s: str) -> str:
         raise ValueError("Channel without channel ID? Something's wrong")
 
 
-def download_channel(
-    channel_id: str,
-    output_directory: str,
-    cursor: datetime,
-    download_hook: Callable[[dict[Any, Any]], None],
-) -> dict[Any, Any] | None:
-    """Downloads YouTube Shorts from a specified channel using yt_dlp with custom options.
+def backup_channel_entries(
+    bucket: Bucket, channel: str, cursor: datetime, org_ids: list[UUID]
+) -> None:
+    log = logger.new()
 
-    This function connects to YouTube and downloads Shorts content from the specified
-    channel.  It uses a datetime cursor to avoid re-downloading already processed
-    content. Video and subtitle options are configured to ensure consistent output and
-    error resilience.  It extracts both manual and auto-generated subtitles. Translated
-    subtitles are skipped via extractor arguments.
+    # returns list[object] because yt_dlp types are really inconsistent across extractors
+    latest_seen = cursor
+    prefix_path = str(STORAGE_PATH_PREFIX / channel) + "/"
 
-    Args:
-        channel_id (str):
-            The YouTube channel ID
-        output_directory (str):
-            The directory path where downloaded files will be saved.
-        cursor (datetime):
-            The datetime threshold for filtering content. Only videos uploaded after
-            this date will be downloaded.
-        download_hook (Callable[[dict[Any, Any]], None]):
-            A callback function that receives download progress information from yt_dlp.
-
-    Returns:
-        dict[Any, Any] | None:
-            A dictionary containing the extracted video information if successful,
-            or None if no videos were found or if download was rejected/failed.
-
-    """
-    log = logger.bind()
+    log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        "fragment_retries": 10,
-        "playlistreverse": True,  # for cursor
-        "dateafter": cursor.date(),
-        "break_on_reject": True,
-        "outtmpl": {
-            "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
-        },
-        "progress_hooks": [download_hook],
-        "postprocessors": [
-            {"key": "FFmpegConcat", "only_multi_video": True, "when": "playlist"}
-        ],
-        "playlist_items": "1:100",
-        "impersonate": ImpersonateTarget(client="chrome"),
+        "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
+        "playlist_items": "1:200",
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
-        "sleep_interval_requests": 0.75,
-        "writeautomaticsub": False,
-        "writesubtitles": False,
+        "sleep_interval_requests": 1.0,
+        "impersonate": ImpersonateTarget(client="chrome"),
+        "ignoreerrors": "only_download",
+        "logtostderr": True,
+        "proxy": proxy_addr(),
+        "lazy_playlist": True,
+        "extract_flat": True,
         "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "web_embedded"],
-                "player_skip": ["configs", "initial_data"],
-                "skip": ["dash", "hls", "translated_subs", "subs"],
-            },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
-        "color": {"stderr": "never", "stdout": "never"},
-        # "quiet": True,
-        # "no_warnings": True,
-        # "noprogress": True,
-        "verbose": True,
-        "ignoreerrors": "only_download",
-        "proxy": f"http://{PROXY_USERNAME}:{PROXY_PASSWORD}@p.webshare.io:80/",
-        "format": "18",
     }
-    with yt_dlp.YoutubeDL(params=opts) as ydl:
-        log.debug(f"yt_dlp downloading {channel_id}", channel_id=channel_id)
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        log.info(f"downloading entries for {channel} to {prefix_path}")
+        info = ydl.extract_info(
+            # the sp parameter is a pre-computed search query that gives
+            # videos of length under 4 minutes, sorted by most recent.
+            f"https://youtube.com/channel/{channel}/shorts",
+            download=False,
+        )
 
-        info = {}
-        try:
-            info = ydl.extract_info(f"https://youtube.com/channel/{channel_id}/shorts")
-            if not info:
-                raise Exception("ydl: no info dict?")
-            return dict(info)
-        except RejectedVideoReached:
-            log.debug("rejected video reached, end of date range or video seen 👍")
-        except DownloadError as ex:
-            log.error("yt_dlp download error", exc_info=ex)
-        except Exception as ex:
-            log.error("non-download error with shorts scraping?", exc_info=ex)
-    return None
+        if not info:
+            raise yt_dlp.utils.DownloadError("Empty info dict")
+
+        entries = info.get("entries")
+        if not isinstance(entries, list):
+            raise yt_dlp.utils.DownloadError("No or malformed entries")
+
+        entries.reverse()
+
+        log.debug(f"{len(entries)} entries found. iterating...")
+        for i, entry in enumerate(entries):
+            log.bind(entry=entry)
+
+            log.info(f"processing {i} of {len(entries)} for channel {channel}...")
+            if not entry:
+                log.debug("entry is none, continuing...")
+                continue
+
+            if "/shorts/" not in entry.get("url", ""):
+                log.debug("ignoring non-short entry, continuing...")
+                continue
+
+            # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
+            # if we use any other format yt-dlp has to merge video and audio streams
+            # separately, which results in the output not correctly being written to stdout
+            # (something to do with subprocesses? not sure) so this is something to consider
+            # when making a change here
+            ctx = {
+                "outtmpl": "-",
+                "logtostderr": True,
+                "format": "18",
+                "proxy": proxy_addr(),
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["tv_simply"],
+                        "player_skip": ["configs", "initial_data"],
+                        "skip": ["dash", "hls", "translated_subs", "subs"],
+                    },
+                    "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+                },
+                "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
+                # "match_filter": yt_dlp.match_filter_func(
+                #     None, [f"upload_date < {int(cursor.strftime("%Y%m%d"))}"]
+                # ),
+            }
+            buf = io.BytesIO()
+            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
+                log.debug(f"downloading to buffer {id(buf)}")
+                try:
+                    downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                    downloaded = cast(dict[Any, Any], downloaded)
+                except RejectedVideoReached as ex:
+                    log.error("video out of date range, skipping", exc_info=ex)
+                    continue
+                except DownloadError as ex:
+                    log.error("yt_dlp download error, skipping", exc_info=ex)
+                    continue
+                except Exception as ex:
+                    log.error(
+                        "non-download error with shorts scraping?, skipping",
+                        exc_info=ex,
+                    )
+                    continue
+
+                log.debug(f"video buffered. buffer size: {buf.tell()}")
+                buf.seek(0)
+
+                if not downloaded:
+                    log.debug("downloaded is none, continuing...")
+                    continue
+
+                # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
+                blob_path = (
+                    prefix_path
+                    + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
+                )
+
+                log.bind(blob_path=blob_path)
+                log.debug(f"uploading blob to path {blob_path}")
+                bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+                buf.close()
+
+                register_download(downloaded, org_ids)
+                if timestamp := downloaded.get("timestamp"):
+                    dt = datetime.fromtimestamp(timestamp)
+                elif upload_date := downloaded.get("upload_date"):
+                    dt = datetime.strptime(upload_date, "%Y%m%d")
+                else:
+                    log.error("short without timestamp/upload date? skipping")
+                    continue
+                update_cursor(channel, dt)
 
 
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
@@ -183,14 +226,21 @@ def channel_download_hook(bucket: Bucket, org_ids: list[UUID]) -> Callable[..., 
 
     """
 
+    log = logger.bind()
+
     def hook(d: dict[Any, Any]) -> None:
         if d.get("status") == "finished":
             status = backup_youtube_video(bucket, d["info_dict"])
             if status:
                 register_download(d["info_dict"], org_ids)
 
-                timestamp = d["info_dict"]["timestamp"]
-                dt = datetime.fromtimestamp(timestamp)
+                if timestamp := d["info_dict"].get("timestamp"):
+                    dt = datetime.fromtimestamp(timestamp)
+                elif upload_date := d["info_dict"].get("upload_date"):
+                    dt = datetime.strptime(upload_date, "%Y%m%d")
+                else:
+                    log.error("short without timestamp/upload date? skipping")
+                    return
                 update_cursor(d["info_dict"]["channel_id"], dt)
 
     return hook

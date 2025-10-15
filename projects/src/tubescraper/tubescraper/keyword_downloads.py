@@ -1,9 +1,8 @@
 import contextlib
 import io
-import os
-import random
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 import requests
@@ -11,22 +10,13 @@ import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
-from tubescraper.register import API_KEY, register_download, update_cursor
+from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
 from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
-PROXY_COUNT = int(os.environ["PROXY_COUNT"])
-PROXY_USERNAME = os.environ["PROXY_USERNAME"]
-PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper/keywords")
-
-
-def proxy_addr() -> str:
-    proxy_id = random.randrange(1, PROXY_COUNT, 1)
-    logger.debug(f"using proxy id {proxy_id}")
-    return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
 def backup_keyword_entries(
@@ -45,7 +35,7 @@ def backup_keyword_entries(
 
     opts = {
         "playlistreverse": True,
-        "dateafter": cursor.date(),
+        "dateafter": cursor.strftime("%Y%m%d"),
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
@@ -113,12 +103,14 @@ def backup_keyword_entries(
                 log.debug(f"downloading to buffer {id(buf)}")
                 try:
                     downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                    downloaded = cast(dict[Any, Any], downloaded)
                 except DownloadError as ex:
                     log.error("yt_dlp download error, skipping", exc_info=ex)
                     continue
                 except Exception as ex:
                     log.error(
-                        "non-download error with shorts scraping?, skipping", exc_info=ex
+                        "non-download error with shorts scraping?, skipping",
+                        exc_info=ex,
                     )
                     continue
 
@@ -137,8 +129,13 @@ def backup_keyword_entries(
                 buf.close()
 
                 register_download(downloaded, org_ids)
-                timestamp = entry.get("timestamp")
-                dt = datetime.fromtimestamp(timestamp)
+                if timestamp := downloaded.get("timestamp"):
+                    dt = datetime.fromtimestamp(timestamp)
+                elif upload_date := downloaded.get("upload_date"):
+                    dt = datetime.strptime(upload_date, "%Y%m%d")
+                else:
+                    log.error("short without timestamp/upload date? skipping")
+                    continue
                 update_cursor(keyword, dt)
 
 
