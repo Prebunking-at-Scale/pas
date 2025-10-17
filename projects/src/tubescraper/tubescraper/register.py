@@ -1,12 +1,15 @@
 import json
 import os
+import random
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import requests
 import structlog
-from tubescraper.hardcoded_channels import OrgName
+from requests.exceptions import HTTPError
+from tubescraper.types import CORE_API, Cursor
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -14,6 +17,15 @@ API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
 STORAGE_PATH_PREFIX = Path("tubescraper")
+PROXY_COUNT = int(os.environ["PROXY_COUNT"])
+PROXY_USERNAME = os.environ["PROXY_USERNAME"]
+PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
+
+
+def proxy_addr() -> str:
+    proxy_id = random.randrange(1, PROXY_COUNT, 1)
+    logger.debug(f"using proxy id {proxy_id}")
+    return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
 def check_entry_exists(video_id: str) -> bool:
@@ -29,19 +41,7 @@ def check_entry_exists(video_id: str) -> bool:
     return False
 
 
-def register_downloads(
-    info: dict[str, Any],
-    orgs: list[OrgName],
-) -> None:
-    log = logger.bind()
-
-    entries = info.get("entries", [])
-    log.debug(f"registering {len(entries)} videos with API")
-    for entry in entries:
-        register_download(entry, orgs)
-
-
-def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
+def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
@@ -90,7 +90,7 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {
-            "for_organisation": orgs,
+            "for_organisation": [str(id) for id in org_ids],
             "youtube_id": entry_id,
         },
     }
@@ -108,3 +108,49 @@ def register_download(entry: dict[Any, Any], orgs: list[OrgName]) -> None:
             exc_info=ex,
             entry=entry,
         )
+
+
+def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
+    """Fetches the current cursor for a given channel and platform from the core API.
+
+    Args:
+        target (str): The channel identifier.
+        platform (str): The platform name, e.g., "youtube".
+
+    Returns:
+        datetime: The cursor timestamp for the given channel and platform.
+        None: No cursor exists for this channel/platform.
+
+    """
+    try:
+        with requests.get(
+            f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
+            headers={"X-API-TOKEN": API_KEY},
+        ) as resp:
+            resp.raise_for_status()
+            data = resp.json()["data"]
+            cursor = Cursor(**data)
+            cursor_date = str(cursor.cursor)
+            return datetime.fromisoformat(cursor_date)
+    except HTTPError as ex:
+        if ex.response.status_code == 404:
+            return None
+        raise ex
+
+
+def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
+    """Updates the stored cursor for a given channel and platform in the core API.
+
+    Args:
+        target (str): The channel identifier.
+        platform (str): The platform name, e.g., "youtube".
+        dt (datetime): The new cursor timestamp to store.
+
+    """
+    with requests.post(
+        url=f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
+        json=dt.isoformat(),
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
+        resp.raise_for_status()
+    return

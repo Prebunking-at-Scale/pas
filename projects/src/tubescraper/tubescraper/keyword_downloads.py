@@ -1,63 +1,30 @@
 import contextlib
 import io
-import json
-import os
-import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
+from uuid import UUID
 
+import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
-from tubescraper.hardcoded_channels import OrgName
-from tubescraper.register import register_download
+from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
+from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
-API_URL = os.environ["API_URL"]
-API_KEYS = os.environ["API_KEYS"]
-API_KEY = json.loads(API_KEYS).pop()
-PROXY_COUNT = int(os.environ["PROXY_COUNT"])
-PROXY_USERNAME = os.environ["PROXY_USERNAME"]
-PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 STORAGE_PATH_PREFIX = Path("tubescraper/keywords")
-
-
-def proxy_addr() -> str:
-    proxy_id = random.randrange(1, PROXY_COUNT, 1)
-    logger.debug(f"using proxy id {proxy_id}")
-    return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
-
-
-def download_cursor(bucket: Bucket, keyword: str) -> datetime:
-    cursor_path = str(STORAGE_PATH_PREFIX / keyword / "cursor")
-    cursor_blob = bucket.blob(cursor_path)
-    if not cursor_blob.exists():
-        return datetime.now(timezone.utc) - timedelta(days=1)
-    cursor = cursor_blob.download_as_text()
-    return datetime.fromisoformat(cursor).replace(tzinfo=timezone.utc)
-
-
-def backup_cursor(bucket: Bucket, keyword: str, cursor: datetime):
-    cursor_path = str(STORAGE_PATH_PREFIX / keyword / "cursor")
-    cursor_blob = bucket.blob(cursor_path)
-    cursor_blob.upload_from_string(cursor.isoformat())
-
-
-def download_existing_ids_for_keyword(bucket: Bucket, keyword: str) -> set[str]:
-    prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
-    return {Path(blob.name).stem for blob in bucket.list_blobs(prefix=prefix_path)}
 
 
 def backup_keyword_entries(
     bucket: Bucket,
     keyword: str,
     cursor: datetime,
-    existing: set[str],
-    orgs: list[OrgName],
-) -> datetime:
+    org_ids: list[UUID],
+) -> None:
     log = logger.new()
 
     # returns list[object] because yt_dlp types are really inconsistent across extractors
@@ -67,7 +34,8 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        "dateafter": cursor.date(),
+        "playlistreverse": True,
+        "dateafter": cursor.strftime("%Y%m%d"),
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
@@ -111,10 +79,6 @@ def backup_keyword_entries(
                 log.debug("ignoring non-short entry, continuing...")
                 continue
 
-            if entry["id"] in existing:
-                log.debug("entry exists, continuing...")
-                continue
-
             # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
             # if we use any other format yt-dlp has to merge video and audio streams
             # separately, which results in the output not correctly being written to stdout
@@ -135,16 +99,18 @@ def backup_keyword_entries(
                 },
             }
             buf = io.BytesIO()
-            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:
+            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
                 log.debug(f"downloading to buffer {id(buf)}")
                 try:
                     downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
+                    downloaded = cast(dict[Any, Any], downloaded)
                 except DownloadError as ex:
                     log.error("yt_dlp download error, skipping", exc_info=ex)
                     continue
                 except Exception as ex:
                     log.error(
-                        "non-download error with shorts scraping?, skipping", exc_info=ex
+                        "non-download error with shorts scraping?, skipping",
+                        exc_info=ex,
                     )
                     continue
 
@@ -162,6 +128,38 @@ def backup_keyword_entries(
                 bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
                 buf.close()
 
-                register_download(downloaded, orgs)
+                register_download(downloaded, org_ids)
+                if timestamp := downloaded.get("timestamp"):
+                    dt = datetime.fromtimestamp(timestamp)
+                elif upload_date := downloaded.get("upload_date"):
+                    dt = datetime.strptime(upload_date, "%Y%m%d")
+                else:
+                    log.error("short without timestamp/upload date? skipping")
+                    continue
+                if dt > cursor:
+                    update_cursor(keyword, dt)
 
-    return latest_seen
+
+def fetch_keyword_feeds() -> list[KeywordFeed]:
+    with requests.get(
+        f"{CORE_API}/media_feeds/keywords",
+        headers={"X-API-TOKEN": API_KEY},
+    ) as resp:
+        resp.raise_for_status()
+        data = resp.json()["data"]
+        return [KeywordFeed(**feed) for feed in data]
+
+
+type KeywordResults = dict[str, list[UUID]]
+
+
+def preprocess_keyword_feeds(feeds: list[KeywordFeed]) -> KeywordResults:
+    """Deduplicates organisation ids from the feeds. We should probably do this in the
+    api.
+    """
+    result: KeywordResults = {}
+    for feed in feeds:
+        for keyword in feed.keywords:
+            result[keyword] = result.get(keyword, []) + [feed.organisation_id]
+
+    return result
