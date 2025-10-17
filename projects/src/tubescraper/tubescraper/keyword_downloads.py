@@ -136,7 +136,8 @@ def backup_keyword_entries(
                 else:
                     log.error("short without timestamp/upload date? skipping")
                     continue
-                update_cursor(keyword, dt)
+                if dt > cursor:
+                    update_cursor(keyword, dt)
 
 
 def fetch_keyword_feeds() -> list[KeywordFeed]:

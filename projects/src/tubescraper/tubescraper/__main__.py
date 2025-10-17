@@ -45,7 +45,16 @@ def channels_downloader(channel_feeds: list[ChannelFeed], storage_bucket: Bucket
         cursor_dt = fetch_cursor(channel_id)
         if not cursor_dt:
             cursor_dt = datetime.now() - timedelta(days=14)
-        backup_channel_entries(storage_bucket, channel_id, cursor_dt, orgs)
+
+        try:
+            backup_channel_entries(storage_bucket, channel_id, cursor_dt, orgs)
+        except ValueError as ex:
+            log.error(
+                "youtube error or media feed probably does not exist, skipping",
+                media_feed=channel,
+                exc_info=ex,
+            )
+            continue
 
 
 def keywords_downloader(keyword_feeds: list[KeywordFeed], storage_bucket: Bucket) -> None:

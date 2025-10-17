@@ -5,7 +5,7 @@ import os
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 from uuid import UUID
 
 import requests
@@ -174,7 +174,8 @@ def backup_channel_entries(
                 else:
                     log.error("short without timestamp/upload date? skipping")
                     continue
-                update_cursor(channel, dt)
+                if dt > cursor:
+                    update_cursor(channel, dt)
 
 
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
@@ -212,38 +213,6 @@ def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     blob = bucket.blob(target_path)
     blob.upload_from_filename(source_path, content_type=type)
     return True
-
-
-def channel_download_hook(bucket: Bucket, org_ids: list[UUID]) -> Callable[..., Any]:
-    """Creates a yt_dlp download hook that uploads finished videos to storage and updates cursors.
-
-    Args:
-        bucket (Bucket): The Google Cloud Storage bucket for uploads.
-        org_id (UUID): The organisation ID the channel was downloaded for.
-
-    Returns:
-        Callable[..., Any]: A function suitable for use as a yt_dlp progress hook.
-
-    """
-
-    log = logger.bind()
-
-    def hook(d: dict[Any, Any]) -> None:
-        if d.get("status") == "finished":
-            status = backup_youtube_video(bucket, d["info_dict"])
-            if status:
-                register_download(d["info_dict"], org_ids)
-
-                if timestamp := d["info_dict"].get("timestamp"):
-                    dt = datetime.fromtimestamp(timestamp)
-                elif upload_date := d["info_dict"].get("upload_date"):
-                    dt = datetime.strptime(upload_date, "%Y%m%d")
-                else:
-                    log.error("short without timestamp/upload date? skipping")
-                    return
-                update_cursor(d["info_dict"]["channel_id"], dt)
-
-    return hook
 
 
 def fetch_channel_feeds() -> list[ChannelFeed]:
