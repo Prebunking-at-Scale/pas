@@ -41,12 +41,12 @@ def channels_downloader(channel_feeds: list[ChannelFeed], storage_bucket: Bucket
         _ = bind_contextvars(channel_name=channel)
         log.info(f"archiving a new channel: {channel}")
 
-        channel_id = id_for_channel(channel)
-        cursor_dt = fetch_cursor(channel_id)
-        if not cursor_dt:
-            cursor_dt = datetime.now() - timedelta(days=14)
-
         try:
+            channel_id = id_for_channel(channel)
+            cursor_dt = fetch_cursor(channel_id)
+            if not cursor_dt:
+                cursor_dt = datetime.now() - timedelta(days=14)
+
             backup_channel_entries(storage_bucket, channel_id, cursor_dt, orgs)
         except ValueError as ex:
             log.error(
