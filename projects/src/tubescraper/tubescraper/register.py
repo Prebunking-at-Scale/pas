@@ -147,6 +147,9 @@ def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
         dt (datetime): The new cursor timestamp to store.
 
     """
+    log = logger.bind()
+
+    log.debug("updating cursor", cursor=dt, target=target)
     with requests.post(
         url=f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
         json=dt.isoformat(),
