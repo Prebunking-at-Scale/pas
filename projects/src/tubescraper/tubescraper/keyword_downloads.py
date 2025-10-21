@@ -13,6 +13,7 @@ from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
 from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
+from yt_dlp.utils import RejectedVideoReached
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -34,8 +35,8 @@ def backup_keyword_entries(
     log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
 
     opts = {
-        "playlistreverse": True,
-        "dateafter": cursor.strftime("%Y%m%d"),
+        "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
+        "playlist_items": "1:200",
         "retries": 10,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
@@ -97,6 +98,8 @@ def backup_keyword_entries(
                     },
                     "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
                 },
+                "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
+                "break_on_reject": True,
             }
             buf = io.BytesIO()
             with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
@@ -104,6 +107,9 @@ def backup_keyword_entries(
                 try:
                     downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
                     downloaded = cast(dict[Any, Any], downloaded)
+                except RejectedVideoReached as ex:
+                    log.error("video out of date range, skipping", exc_info=ex)
+                    break  # stop iteration
                 except DownloadError as ex:
                     log.error("yt_dlp download error, skipping", exc_info=ex)
                     continue
@@ -138,6 +144,7 @@ def backup_keyword_entries(
                     continue
                 if dt > cursor:
                     update_cursor(keyword, dt)
+                    cursor = dt
 
 
 def fetch_keyword_feeds() -> list[KeywordFeed]:

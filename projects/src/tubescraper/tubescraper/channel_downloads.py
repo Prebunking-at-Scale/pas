@@ -47,6 +47,72 @@ def id_for_channel(s: str) -> str:
         raise ValueError("Channel without channel ID? Something's wrong")
 
 
+type BufferedEntry = tuple[dict[Any, Any], io.BytesIO]
+
+
+def download_video_for_daterange(
+    entry_id: str, cursor: datetime, buf: io.BytesIO
+) -> BufferedEntry:
+    log = logger.bind()
+
+    for attempt in range(1, 4):
+        # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
+        # if we use any other format yt-dlp has to merge video and audio streams
+        # separately, which results in the output not correctly being written to stdout
+        # (something to do with subprocesses? not sure) so this is something to consider
+        # when making a change here
+        ctx = {
+            "outtmpl": "-",
+            "logtostderr": True,
+            "format": "18",
+            "proxy": proxy_addr(),
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_simply"],
+                    "player_skip": ["configs", "initial_data"],
+                    "skip": ["dash", "hls", "translated_subs", "subs"],
+                },
+                "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+            },
+            "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
+            "break_on_reject": True,
+        }
+        with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
+            log.debug(f"downloading to buffer {id(buf)}")
+            try:
+                downloaded = video.extract_info(entry_id)  # pyright: ignore
+                downloaded = cast(dict[Any, Any], downloaded)
+            except RejectedVideoReached as ex:
+                log.error("video out of date range, ending iteration", exc_info=ex)
+                raise ex
+            except DownloadError as ex:
+                log.error(f"yt_dlp download error, attempt {attempt}", exc_info=ex)
+                if 3 <= attempt:
+                    raise Exception from ex
+                continue
+
+            log.debug(f"video buffered. buffer size: {buf.tell()}")
+            _ = buf.seek(0)
+            return (downloaded, buf)
+    raise Exception("should be unreachable")
+
+
+def upload_blob(
+    bucket: Bucket, prefix_path: str, downloaded: dict[Any, Any], buf: io.BytesIO
+) -> None:
+    log = logger.bind()
+
+    # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
+    blob_path = (
+        prefix_path
+        + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
+    )
+
+    log = log.bind(blob_path=blob_path)
+    log.debug(f"uploading blob to path {blob_path}")
+    bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+
+
 def backup_channel_entries(
     bucket: Bucket, channel: str, cursor: datetime, org_ids: list[UUID]
 ) -> None:
@@ -91,8 +157,6 @@ def backup_channel_entries(
         if not isinstance(entries, list):
             raise yt_dlp.utils.DownloadError("No or malformed entries")
 
-        entries.reverse()
-
         log.debug(f"{len(entries)} entries found. iterating...")
         for i, entry in enumerate(entries):
             log.bind(entry=entry)
@@ -106,67 +170,13 @@ def backup_channel_entries(
                 log.debug("ignoring non-short entry, continuing...")
                 continue
 
-            # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
-            # if we use any other format yt-dlp has to merge video and audio streams
-            # separately, which results in the output not correctly being written to stdout
-            # (something to do with subprocesses? not sure) so this is something to consider
-            # when making a change here
-            ctx = {
-                "outtmpl": "-",
-                "logtostderr": True,
-                "format": "18",
-                "proxy": proxy_addr(),
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["tv_simply"],
-                        "player_skip": ["configs", "initial_data"],
-                        "skip": ["dash", "hls", "translated_subs", "subs"],
-                    },
-                    "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
-                },
-                "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
-                # "match_filter": yt_dlp.match_filter_func(
-                #     None, [f"upload_date < {int(cursor.strftime("%Y%m%d"))}"]
-                # ),
-            }
-            buf = io.BytesIO()
-            with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
-                log.debug(f"downloading to buffer {id(buf)}")
-                try:
-                    downloaded = video.extract_info(entry["id"])  # fmt: skip  # extract_info again to use the POT server (duh?)
-                    downloaded = cast(dict[Any, Any], downloaded)
-                except RejectedVideoReached as ex:
-                    log.error("video out of date range, skipping", exc_info=ex)
-                    continue
-                except DownloadError as ex:
-                    log.error("yt_dlp download error, skipping", exc_info=ex)
-                    continue
-                except Exception as ex:
-                    log.error(
-                        "non-download error with shorts scraping?, skipping",
-                        exc_info=ex,
-                    )
-                    continue
-
-                log.debug(f"video buffered. buffer size: {buf.tell()}")
-                buf.seek(0)
-
-                if not downloaded:
-                    log.debug("downloaded is none, continuing...")
-                    continue
-
-                # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
-                blob_path = (
-                    prefix_path
-                    + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
-                )
-
-                log.bind(blob_path=blob_path)
-                log.debug(f"uploading blob to path {blob_path}")
-                bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+            try:
+                buf = io.BytesIO()
+                downloaded, buf = download_video_for_daterange(entry["id"], cursor, buf)
+                upload_blob(bucket, prefix_path, downloaded, buf)
+                register_download(downloaded, org_ids)
                 buf.close()
 
-                register_download(downloaded, org_ids)
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)
                 elif upload_date := downloaded.get("upload_date"):
@@ -176,6 +186,15 @@ def backup_channel_entries(
                     continue
                 if dt > cursor:
                     update_cursor(channel, dt)
+                    cursor = dt
+
+            except RejectedVideoReached:
+                # stop downloading new entries
+                break
+
+            except Exception as ex:
+                log.error("exception with downloading, skipping entry", exc_info=ex)
+                continue
 
 
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
