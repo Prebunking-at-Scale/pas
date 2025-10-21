@@ -144,6 +144,7 @@ def backup_keyword_entries(
                     continue
                 if dt > cursor:
                     update_cursor(keyword, dt)
+                    cursor = dt
 
 
 def fetch_keyword_feeds() -> list[KeywordFeed]:
