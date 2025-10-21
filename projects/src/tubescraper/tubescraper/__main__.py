@@ -74,7 +74,16 @@ def keywords_downloader(keyword_feeds: list[KeywordFeed], storage_bucket: Bucket
         cursor_dt = fetch_cursor(keyword)
         if not cursor_dt:
             cursor_dt = datetime.now() - timedelta(days=14)
-        backup_keyword_entries(storage_bucket, keyword, cursor_dt, org_ids)
+
+        try:
+            backup_keyword_entries(storage_bucket, keyword, cursor_dt, org_ids)
+        except ValueError as ex:
+            log.error(
+                "youtube error or search failed for keyword, skipping",
+                keyword=keyword,
+                exc_info=ex,
+            )
+            continue
 
 
 if __name__ == "__main__":

@@ -65,11 +65,11 @@ def backup_keyword_entries(
         )
 
         if not info:
-            raise yt_dlp.utils.DownloadError("Empty info dict")
+            raise ValueError("Empty info dict")
 
         entries = info.get("entries")
         if not isinstance(entries, list):
-            raise yt_dlp.utils.DownloadError("No or malformed entries")
+            raise ValueError("No or malformed entries")
 
         log.debug(f"{len(entries)} entries found. iterating...")
         for i, entry in enumerate(entries):
