@@ -116,13 +116,17 @@ def upload_blob(
 def backup_channel_entries(
     bucket: Bucket, channel: str, cursor: datetime, org_ids: list[UUID]
 ) -> None:
+    """Downloads and archives YouTube shorts from a channel.
+
+    Updates the cursor only once at the end with the maximum timestamp seen.
+    """
     log = logger.new()
 
-    # returns list[object] because yt_dlp types are really inconsistent across extractors
+    # Track the newest timestamp we've seen to update cursor at the end
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / channel) + "/"
 
-    log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
+    log = log.bind(cursor=cursor, prefix_path=prefix_path)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -184,9 +188,10 @@ def backup_channel_entries(
                 else:
                     log.error("short without timestamp/upload date? skipping")
                     continue
-                if dt > cursor:
-                    update_cursor(channel, dt)
-                    cursor = dt
+
+                # Track the maximum timestamp, don't update cursor yet
+                if dt > latest_seen:
+                    latest_seen = dt
 
             except RejectedVideoReached:
                 # stop downloading new entries
@@ -195,6 +200,11 @@ def backup_channel_entries(
             except Exception as ex:
                 log.error("exception with downloading, skipping entry", exc_info=ex)
                 continue
+
+        # Update cursor once at the end with the newest timestamp seen
+        if latest_seen > cursor:
+            log.info(f"updating cursor from {cursor} to {latest_seen}")
+            update_cursor(channel, latest_seen)
 
 
 def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:

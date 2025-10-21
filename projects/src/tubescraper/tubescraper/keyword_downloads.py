@@ -26,13 +26,17 @@ def backup_keyword_entries(
     cursor: datetime,
     org_ids: list[UUID],
 ) -> None:
+    """Downloads and archives YouTube shorts matching a keyword search.
+
+    Updates the cursor only once at the end with the maximum timestamp seen.
+    """
     log = logger.new()
 
-    # returns list[object] because yt_dlp types are really inconsistent across extractors
+    # Track the newest timestamp we've seen to update cursor at the end
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
 
-    log = log.bind(cursor=latest_seen, prefix_path=prefix_path)
+    log = log.bind(cursor=cursor, prefix_path=prefix_path)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -142,9 +146,15 @@ def backup_keyword_entries(
                 else:
                     log.error("short without timestamp/upload date? skipping")
                     continue
-                if dt > cursor:
-                    update_cursor(keyword, dt)
-                    cursor = dt
+
+                # Track the maximum timestamp, don't update cursor yet
+                if dt > latest_seen:
+                    latest_seen = dt
+
+        # Update cursor once at the end with the newest timestamp seen
+        if latest_seen > cursor:
+            log.info(f"updating cursor from {cursor} to {latest_seen}")
+            update_cursor(keyword, latest_seen)
 
 
 def fetch_keyword_feeds() -> list[KeywordFeed]:
