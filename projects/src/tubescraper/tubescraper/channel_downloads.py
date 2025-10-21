@@ -186,6 +186,7 @@ def backup_channel_entries(
                     continue
                 if dt > cursor:
                     update_cursor(channel, dt)
+                    cursor = dt
 
             except RejectedVideoReached:
                 # stop downloading new entries
