@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import urllib.parse
 from uuid import UUID
 
 import requests
@@ -123,8 +124,9 @@ def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
 
     """
     try:
+        safe_target = urllib.parse.quote('/', safe='')
         with requests.get(
-            f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
+            f"{CORE_API}/media_feeds/cursors/{safe_target}/{platform}",
             headers={"X-API-TOKEN": API_KEY},
         ) as resp:
             resp.raise_for_status()
@@ -149,10 +151,10 @@ def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
 
     """
     log = logger.bind()
-
+    safe_target = urllib.parse.quote('/', safe='')
     log.debug("updating cursor", cursor=dt, target=target)
     with requests.post(
-        url=f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
+        url=f"{CORE_API}/media_feeds/cursors/{safe_target}/{platform}",
         json={
             "cursor": dt.isoformat(),
         },
