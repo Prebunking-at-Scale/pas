@@ -96,9 +96,10 @@ def backup_keyword_entries(
                 "proxy": proxy_addr(),
                 "extractor_args": {
                     "youtube": {
-                        "player_client": ["tv_simply"],
+                        # "player_client": ["tv_simply"],
                         "player_skip": ["configs", "initial_data"],
                         "skip": ["dash", "hls", "translated_subs", "subs"],
+                        "player_js_version": ["actual"],
                     },
                     "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
                 },
