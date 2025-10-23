@@ -151,7 +151,7 @@ def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
 
     """
     log = logger.bind()
-    safe_target = urllib.parse.quote('/', safe='')
+    safe_target = urllib.parse.quote(target, safe='')
     log.debug("updating cursor", cursor=dt, target=target)
     with requests.post(
         url=f"{CORE_API}/media_feeds/cursors/{safe_target}/{platform}",
