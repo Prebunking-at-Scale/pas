@@ -18,7 +18,7 @@ spec:
             - name: youtubepot-bgutil
               image: brainicism/bgutil-ytdlp-pot-provider:1.2.2
               imagePullPolicy: Always
-              restartPolicy:
+              restartPolicy: Always
               resources:
                 limits:
                   cpu: 1
