@@ -74,7 +74,9 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
 
     uploaded_at = None
     if upload_date := entry.get("upload_date"):
-        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
+        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(
+            tzinfo=timezone.utc
+        )
 
     data: dict[str, Any] = {
         "channel": entry.get("uploader_id"),
@@ -87,7 +89,9 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         "source_url": entry.get("webpage_url"),
         "title": entry.get("title"),
         "uploaded_at": (
-            uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else uploaded_at
+            uploaded_at.isoformat()
+            if isinstance(uploaded_at, datetime)
+            else uploaded_at
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {
@@ -111,6 +115,11 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         )
 
 
+def make_safe_cursor_target(target: str) -> str:
+    target = target.replace("/", "-").strip()
+    return urllib.parse.quote(target, safe="")
+
+
 def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
     """Fetches the current cursor for a given channel and platform from the core API.
 
@@ -124,9 +133,9 @@ def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
 
     """
     try:
-        safe_target = urllib.parse.quote('/', safe='')
+        target = make_safe_cursor_target(target)
         with requests.get(
-            f"{CORE_API}/media_feeds/cursors/{safe_target}/{platform}",
+            f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
             headers={"X-API-TOKEN": API_KEY},
         ) as resp:
             resp.raise_for_status()
@@ -151,10 +160,10 @@ def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
 
     """
     log = logger.bind()
-    safe_target = urllib.parse.quote(target, safe='')
+    target = make_safe_cursor_target(target)
     log.debug("updating cursor", cursor=dt, target=target)
     with requests.post(
-        url=f"{CORE_API}/media_feeds/cursors/{safe_target}/{platform}",
+        url=f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
         json={
             "cursor": dt.isoformat(),
         },
