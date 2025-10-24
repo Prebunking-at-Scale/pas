@@ -27,7 +27,7 @@ spec:
                   memory: 256M
           containers:
             - name: tubescraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:dev
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
               imagePullPolicy: Always
               resources:
                 limits:

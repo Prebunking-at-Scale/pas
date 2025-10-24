@@ -30,7 +30,8 @@ To deploy a project currently requires a few steps:
 So for example to deploy `tubescraper` to production:
 
 ```
-$ docker compose build tubescraper
+$ gcloud container clusters get-credentials prod-cluster --project pas-production-1 --location europe-west4-b
+$ DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build tubescraper
 $ docker push europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
 $ kubectl apply -f deployments/tubescraper.prod.yml # optional, only if you've changed it
 ```
@@ -42,4 +43,4 @@ $ kubectl apply -f deployments/tubescraper.prod.yml # optional, only if you've c
 - [] Initialising an application
 - [] Testing
 - [] Kubernetes stuff
-- [] Terraform 
+- [] Terraform

@@ -3,21 +3,22 @@ kind: CronJob
 metadata:
   name: tubescraper
 spec:
-  concurrencyPolicy: Replace
-  successfulJobsHistoryLimit: 0
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/12 * * *
+  schedule: 0 0/1 * * *
   jobTemplate:
     spec:
       template:
         spec:
-          restartPolicy: Never
+          restartPolicy: OnFailure
           serviceAccountName: workload-identity-sa
           initContainers:
             - name: youtubepot-bgutil
               image: brainicism/bgutil-ytdlp-pot-provider:1.2.2
               imagePullPolicy: Always
-              restartPolicy: Always
+              restartPolicy:
               resources:
                 limits:
                   cpu: 1
