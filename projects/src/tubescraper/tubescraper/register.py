@@ -141,8 +141,8 @@ def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
             resp.raise_for_status()
             data = resp.json()["data"]
             cursor = Cursor(**data)
-            if isinstance(cursor, dict):
-                if cursor_date := cursor.get("cursor"):
+            if "last_video_datetime" in cursor.cursor:
+                if cursor_date := cursor.cursor.get("last_video_datetime"):
                     return datetime.fromisoformat(cursor_date)
     except HTTPError as ex:
         if ex.response.status_code == 404:
@@ -165,7 +165,7 @@ def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
     with requests.post(
         url=f"{CORE_API}/media_feeds/cursors/{target}/{platform}",
         json={
-            "cursor": dt.isoformat(),
+            "last_video_datetime": dt.isoformat(),
         },
         headers={"X-API-TOKEN": API_KEY},
     ) as resp:

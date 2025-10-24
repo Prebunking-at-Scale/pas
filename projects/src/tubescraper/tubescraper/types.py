@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel
 
 CORE_API = os.environ["API_URL"]
 
@@ -33,6 +33,6 @@ class Cursor(BaseModel):
     id: UUID
     target: str
     platform: Platform
-    cursor: JsonValue = {}
+    cursor: dict = {}
     created_at: datetime | None = None
     updated_at: datetime | None = None
