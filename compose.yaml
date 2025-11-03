@@ -20,3 +20,19 @@ services:
       additional_contexts:
         base_image: "service:base_image"
     image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:dev
+
+  tokscraper:
+    build:
+      context: ./projects/src/tokscraper
+      dockerfile: Containerfile
+      additional_contexts:
+        base_image: "service:base_image"
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:latest
+
+  tokscraper_dev:
+    build:
+      context: ./projects/src/tokscraper
+      dockerfile: Containerfile
+      additional_contexts:
+        base_image: "service:base_image"
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:dev

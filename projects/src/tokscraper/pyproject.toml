@@ -1,0 +1,32 @@
+[project]
+name = "tokscraper"
+version = "0.1.0"
+description = "Scrapes TikTok, unsurprisingly"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "curl-cffi>=0.13.0",
+    "google-cloud-storage>=3.1.1",
+    "pas-log",
+    "pydantic>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
+    "structlog>=25.4.0",
+    "yt-dlp[default]>=2025.10.22",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+pas-log = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["responses>=0.25.7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tokscraper"]
