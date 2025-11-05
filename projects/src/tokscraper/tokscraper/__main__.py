@@ -34,9 +34,6 @@ def channels_downloader(channel_feeds: list[ChannelFeed], storage_bucket: Bucket
         _ = bind_contextvars(channel_name=channel)
         log.info(f"archiving a new channel: {channel}")
 
-        if not channel.startswith("@"):
-            channel = f"@{channel}"
-
         try:
             cursor_dt = fetch_cursor(channel)
             if not cursor_dt:

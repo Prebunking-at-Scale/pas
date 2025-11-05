@@ -1,7 +1,5 @@
 import contextlib
 import io
-import mimetypes
-import os
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
@@ -34,11 +32,6 @@ def download_video_for_daterange(
     log = logger.bind()
 
     for attempt in range(1, 4):
-        # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
-        # if we use any other format yt-dlp has to merge video and audio streams
-        # separately, which results in the output not correctly being written to stdout
-        # (something to do with subprocesses? not sure) so this is something to consider
-        # when making a change here
         ctx = {
             "outtmpl": "-",
             "logtostderr": True,
@@ -116,12 +109,7 @@ def backup_channel_entries(
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"downloading entries for {channel} to {prefix_path}")
-        info = ydl.extract_info(
-            # the sp parameter is a pre-computed search query that gives
-            # videos of length under 4 minutes, sorted by most recent.
-            f"https://tiktok.com/{channel}",
-            download=False,
-        )
+        info = ydl.extract_info(f"https://tiktok.com/{channel}", download=False)
 
         if not info:
             raise ValueError("Empty info dict")
@@ -144,7 +132,6 @@ def backup_channel_entries(
                 downloaded, buf = download_video_for_daterange(entry, cursor, buf)
                 upload_blob(bucket, prefix_path, downloaded, buf)
                 register_download(downloaded, org_ids)
-                buf.close()
 
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)
@@ -172,43 +159,6 @@ def backup_channel_entries(
             update_cursor(channel, latest_seen)
 
 
-def backup_tiktok_video(bucket: Bucket, info: dict[str, Any]) -> bool:
-    """Uploads downloaded files from a channel to Google Cloud Storage.
-
-    Args:
-        bucket (Bucket): GCS bucket to upload to.
-        info (dict): yt-dlp's info dict output.
-    """
-    channel_id = info.get("channel_id", "unknown")
-    filename = info.get("filename")
-
-    log = logger.bind(channel_id=channel_id, filename=filename)
-
-    if not filename:
-        log.error(f"filename missing for video {info.get("id")}")
-        return False
-
-    basename = os.path.basename(filename)
-
-    source_path: str = str(filename)
-    target_path: str = str(STORAGE_PATH_PREFIX / channel_id / basename)
-    type, _ = mimetypes.guess_file_type(source_path)
-
-    log = log.bind(
-        filename=filename,
-        basename=basename,
-        source_path=source_path,
-        target_path=target_path,
-        content_type=type,
-    )
-
-    log.debug(f"backing up {filename} to {target_path}")
-
-    blob = bucket.blob(target_path)
-    blob.upload_from_filename(source_path, content_type=type)
-    return True
-
-
 def fetch_channel_feeds() -> list[ChannelFeed]:
     """Fetches channel feed data from the core API.
 
@@ -234,6 +184,11 @@ def preprocess_channel_feeds(feeds: Iterable[ChannelFeed]) -> ChannelWatchers:
     for feed in feeds:
         if feed.platform != "tiktok":
             continue
-        result[feed.channel] = result.get(feed.channel, []) + [feed.organisation_id]
+
+        channel = feed.channel
+        if not channel.startswith("@"):
+            channel = f"@{channel}"
+
+        result[channel] = result.get(channel, []) + [feed.organisation_id]
 
     return result
