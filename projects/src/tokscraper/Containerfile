@@ -1,0 +1,15 @@
+FROM base_image
+
+RUN apk add --no-cache ffmpeg deno
+
+COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+WORKDIR /app
+COPY README.md pyproject.toml /app/tokscraper/
+COPY tokscraper /app/tokscraper/tokscraper
+
+RUN uv lock --no-upgrade && uv sync --all-packages --locked
+
+WORKDIR /app/tokscraper
+CMD ["uv", "run", "python3", "-m", "tokscraper"]

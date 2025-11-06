@@ -10,14 +10,14 @@ from uuid import UUID
 import requests
 import structlog
 from requests.exceptions import HTTPError
-from tubescraper.types import CORE_API, Cursor
+from tokscraper.types import CORE_API, Cursor
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 API_URL = os.environ["API_URL"]
 API_KEYS = os.environ["API_KEYS"]
 API_KEY = json.loads(API_KEYS).pop()
-STORAGE_PATH_PREFIX = Path("tubescraper")
+STORAGE_PATH_PREFIX = Path("tokscraper")
 PROXY_COUNT = int(os.environ["PROXY_COUNT"])
 PROXY_USERNAME = os.environ["PROXY_USERNAME"]
 PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
@@ -30,7 +30,7 @@ def proxy_addr() -> str:
 
 
 def check_entry_exists(video_id: str) -> bool:
-    query = {"metadata": f'$.youtube_id == "{video_id}"'}
+    query = {"metadata": f'$.tiktok_id == "{video_id}"'}
     with requests.post(
         f"{API_URL}/videos/filter",
         json=query,
@@ -77,14 +77,14 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
 
     data: dict[str, Any] = {
-        "channel": entry.get("uploader_id"),
-        "channel_followers": entry.get("channel_follower_count"),
+        "channel": entry.get("channel"),
+        "channel_followers": entry.get("channel_follower_count") or 0,
         "comments": entry.get("comment_count") or 0,
         "description": entry.get("description"),
         "destination_path": filepath,
         "likes": entry.get("like_count") or 0,
-        "platform": "youtube",
-        "source_url": entry.get("webpage_url"),
+        "platform": "tiktok",
+        "source_url": entry.get("url"),
         "title": entry.get("title"),
         "uploaded_at": (
             uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else uploaded_at
@@ -92,7 +92,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         "views": entry.get("view_count") or 0,
         "metadata": {
             "for_organisation": [str(id) for id in org_ids],
-            "youtube_id": entry_id,
+            "tiktok_id": entry_id,
         },
     }
 
@@ -116,12 +116,12 @@ def make_safe_cursor_target(target: str) -> str:
     return urllib.parse.quote(target, safe="")
 
 
-def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
+def fetch_cursor(target: str, platform: str = "tiktok") -> datetime | None:
     """Fetches the current cursor for a given channel and platform from the core API.
 
     Args:
         target (str): The channel identifier.
-        platform (str): The platform name, e.g., "youtube".
+        platform (str): The platform name, e.g., "tiktok".
 
     Returns:
         datetime: The cursor timestamp for the given channel and platform.
@@ -146,12 +146,12 @@ def fetch_cursor(target: str, platform: str = "youtube") -> datetime | None:
         raise ex
 
 
-def update_cursor(target: str, dt: datetime, platform: str = "youtube") -> None:
+def update_cursor(target: str, dt: datetime, platform: str = "tiktok") -> None:
     """Updates the stored cursor for a given channel and platform in the core API.
 
     Args:
         target (str): The channel identifier.
-        platform (str): The platform name, e.g., "youtube".
+        platform (str): The platform name, e.g., "tiktok".
         dt (datetime): The new cursor timestamp to store.
 
     """
