@@ -70,7 +70,7 @@ def upload_blob(
     # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
     blob_path = (
         prefix_path
-        + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
+        + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}.{downloaded["ext"]}"
     )
 
     log = log.bind(blob_path=blob_path)

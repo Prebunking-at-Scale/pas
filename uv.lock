@@ -1200,7 +1200,6 @@ name = "tokscraper"
 version = "0.1.0"
 source = { editable = "projects/src/tokscraper" }
 dependencies = [
-    { name = "bgutil-ytdlp-pot-provider" },
     { name = "curl-cffi" },
     { name = "google-cloud-storage" },
     { name = "pas-log" },
@@ -1218,7 +1217,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bgutil-ytdlp-pot-provider", specifier = ">=1.2.2" },
     { name = "curl-cffi", specifier = ">=0.13.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.1" },
     { name = "pas-log", editable = "projects/lib/pas_log" },

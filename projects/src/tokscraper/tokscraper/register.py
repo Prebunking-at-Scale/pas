@@ -63,13 +63,13 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         log.warning(f"we didn't download video {entry_id}, skipping")
         return None
 
-    channel_id = entry.get("channel_id", "")
-    if not channel_id:
-        log.warning(f"no channel_id set for video {entry_id}, setting it to 'unknown'")
-        channel_id = "unknown"
+    uploader = f"@{entry.get("uploader", "")}"
+    if not uploader:
+        log.warning(f"no uploader set for video {entry_id}, setting it to 'unknown'")
+        uploader = "unknown"
 
     filename = f"{entry.get('id')}.{entry.get('channel_id')}.{entry.get('timestamp')}.{entry.get('ext')}"
-    filepath = str(STORAGE_PATH_PREFIX / channel_id / filename)
+    filepath = str(STORAGE_PATH_PREFIX / uploader / filename)
     log = log.bind(filename=filename, filepath=filepath)
 
     uploaded_at = None
@@ -77,7 +77,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
 
     data: dict[str, Any] = {
-        "channel": entry.get("channel"),
+        "channel": entry.get("uploader", "unknown"),
         "channel_followers": entry.get("channel_follower_count") or 0,
         "comments": entry.get("comment_count") or 0,
         "description": entry.get("description"),
