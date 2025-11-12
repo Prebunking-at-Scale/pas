@@ -3,15 +3,16 @@ kind: CronJob
 metadata:
   name: tubescraper
 spec:
-  concurrencyPolicy: Replace
-  successfulJobsHistoryLimit: 0
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/12 * * *
+  schedule: 0 0/1 * * *
   jobTemplate:
     spec:
       template:
         spec:
-          restartPolicy: Never
+          restartPolicy: OnFailure
           serviceAccountName: workload-identity-sa
           initContainers:
             - name: youtubepot-bgutil
@@ -27,7 +28,7 @@ spec:
                   memory: 256M
           containers:
             - name: tubescraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:dev
               imagePullPolicy: Always
               resources:
                 limits:
