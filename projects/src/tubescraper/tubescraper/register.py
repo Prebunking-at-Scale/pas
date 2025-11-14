@@ -31,20 +31,17 @@ def proxy_addr() -> str:
     return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
-def upload_blob(
-    bucket: Bucket, prefix_path: str, downloaded: dict[Any, Any], buf: io.BytesIO
-) -> str:
-    log = logger.bind()
-
-    blob_path = (
+def generate_blob_path(prefix_path: str, downloaded: dict[Any, Any]) -> str:
+    return (
         prefix_path
         + f"{downloaded['id']}.{downloaded['channel_id']}.{downloaded['timestamp']}.{downloaded['ext']}"
     )
 
-    log = log.bind(blob_path=blob_path)
+
+def upload_blob(bucket: Bucket, blob_path: str, buf: io.BytesIO) -> None:
+    log = logger.bind(blob_path=blob_path)
     log.debug(f"uploading blob to path {blob_path}")
     bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
-    return blob_path
 
 
 def check_entry_exists(video_id: str) -> bool:

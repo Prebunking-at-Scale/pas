@@ -14,6 +14,7 @@ import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.register import (
     API_KEY,
+    generate_blob_path,
     proxy_addr,
     register_download,
     update_cursor,
@@ -168,7 +169,8 @@ def backup_channel_entries(
             try:
                 buf = io.BytesIO()
                 downloaded, buf = download_video_for_daterange(entry["id"], cursor, buf)
-                blob_path = upload_blob(bucket, prefix_path, downloaded, buf)
+                blob_path = generate_blob_path(prefix_path, downloaded)
+                upload_blob(bucket, blob_path, buf)
                 register_download(downloaded, org_ids, blob_path)
                 buf.close()
 

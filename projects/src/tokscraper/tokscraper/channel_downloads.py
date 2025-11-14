@@ -62,20 +62,17 @@ def download_video_for_daterange(
     raise Exception("should be unreachable")
 
 
-def upload_blob(
-    bucket: Bucket, prefix_path: str, downloaded: dict[Any, Any], buf: io.BytesIO
-) -> str:
-    log = logger.bind()
-
-    blob_path = (
+def generate_blob_path(prefix_path: str, downloaded: dict[Any, Any]) -> str:
+    return (
         prefix_path
         + f"{downloaded['id']}.{downloaded['channel_id']}.{downloaded['timestamp']}.{downloaded['ext']}"
     )
 
-    log = log.bind(blob_path=blob_path)
+
+def upload_blob(bucket: Bucket, blob_path: str, buf: io.BytesIO) -> None:
+    log = logger.bind(blob_path=blob_path)
     log.debug(f"uploading blob to path {blob_path}")
     bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
-    return blob_path
 
 
 def backup_channel_entries(
@@ -130,7 +127,8 @@ def backup_channel_entries(
             try:
                 buf = io.BytesIO()
                 downloaded, buf = download_video_for_daterange(entry, cursor, buf)
-                blob_path = upload_blob(bucket, prefix_path, downloaded, buf)
+                blob_path = generate_blob_path(prefix_path, downloaded)
+                upload_blob(bucket, blob_path, buf)
                 register_download(downloaded, org_ids, blob_path)
 
                 if timestamp := downloaded.get("timestamp"):

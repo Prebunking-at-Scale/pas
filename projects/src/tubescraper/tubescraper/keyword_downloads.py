@@ -12,6 +12,7 @@ from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.register import (
     API_KEY,
+    generate_blob_path,
     proxy_addr,
     register_download,
     update_cursor,
@@ -138,7 +139,8 @@ def backup_keyword_entries(
                     log.debug("downloaded is none, continuing...")
                     continue
 
-                blob_path = upload_blob(bucket, prefix_path, downloaded, buf)
+                blob_path = generate_blob_path(prefix_path, downloaded)
+                upload_blob(bucket, blob_path, buf)
                 buf.close()
 
                 register_download(downloaded, org_ids, blob_path)
