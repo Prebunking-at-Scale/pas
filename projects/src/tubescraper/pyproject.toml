@@ -13,7 +13,7 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
     "structlog>=25.4.0",
-    "yt-dlp[default]>=2025.10.22",
+    "yt-dlp[default]>=2025.11.12",
 ]
 
 [tool.uv]

@@ -12,7 +12,7 @@ spec:
     spec:
       template:
         spec:
-          restartPolicy: OnFailure
+          restartPolicy: Never
           serviceAccountName: workload-identity-sa
           initContainers:
             - name: youtubepot-bgutil
