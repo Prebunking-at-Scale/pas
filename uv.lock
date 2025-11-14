@@ -303,19 +303,6 @@ wheels = [
 ]
 
 [[package]]
-name = "deno"
-version = "2.5.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/58/74/5b77399bfa7a5b29579ce9480d6f9a43960bd6bfc59e139e8f7cc6a69ce8/deno-2.5.6.tar.gz", hash = "sha256:4fa5405c8cc43c908d145ad3ed0d7294227fd599da560a0513ba7d3a34948c80", size = 4932, upload-time = "2025-11-11T00:57:50.584Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/1d/168aca27d80a0b37ccccc0213475ad9762840cc0aa4edced888d6e323e7f/deno-2.5.6-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:3a602e39ee6aedfe0ceb6334d88d6c1bae77ee7a92c5bc5159bf65bf764c322a", size = 43269522, upload-time = "2025-11-11T00:57:35.456Z" },
-    { url = "https://files.pythonhosted.org/packages/7c/2e/07e4063351840a65175993f7f79e692226bb19778d513cacef8ea54820d7/deno-2.5.6-py3-none-macosx_11_0_arm64.whl", hash = "sha256:e6c5914222e4564a6af4c9b197e603bde45acdb1b7ed57b4f56e2892bc7a1d6b", size = 40624745, upload-time = "2025-11-11T00:57:39.783Z" },
-    { url = "https://files.pythonhosted.org/packages/45/a0/7ce338ae0243dc233758abc38b396f558a877d89930bcf57ffd2794ec5ba/deno-2.5.6-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:68783e2278b7fd04adffd3d46c753593989316ceafbf373db410ad57e9c5369f", size = 44002109, upload-time = "2025-11-11T00:57:42.601Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/5e/ff434e569f17678f28de9e66640a1293d414c930918990cf247dda080597/deno-2.5.6-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:8f657dabfda0d04b219cbfcb52351fcd569a1a565d3b3cdbaac8bc736b1b5ece", size = 45837360, upload-time = "2025-11-11T00:57:45.537Z" },
-    { url = "https://files.pythonhosted.org/packages/ae/02/a82a34e924442eda05f15924a30b577a08b2d92e5e400a27bd9d84d95122/deno-2.5.6-py3-none-win_amd64.whl", hash = "sha256:107c776b275788b63b8ed768ddfea5ebae0e065a654189bef4532c87e08d72ba", size = 44705820, upload-time = "2025-11-11T00:57:48.342Z" },
-]
-
-[[package]]
 name = "distlib"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1250,7 +1237,6 @@ source = { editable = "projects/src/tubescraper" }
 dependencies = [
     { name = "bgutil-ytdlp-pot-provider" },
     { name = "curl-cffi" },
-    { name = "deno" },
     { name = "google-cloud-storage" },
     { name = "pas-log" },
     { name = "pydantic" },
@@ -1269,7 +1255,6 @@ dev = [
 requires-dist = [
     { name = "bgutil-ytdlp-pot-provider", specifier = ">=1.2.2" },
     { name = "curl-cffi", specifier = ">=0.13.0" },
-    { name = "deno", specifier = ">=2.5.6" },
     { name = "google-cloud-storage", specifier = ">=3.1.1" },
     { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },

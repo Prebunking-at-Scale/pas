@@ -5,6 +5,9 @@ RUN apk add --no-cache ffmpeg deno
 COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
+# JS runtime for yt-dlp: https://github.com/yt-dlp/yt-dlp/issues/15012
+RUN apk add --no-cache deno
+
 WORKDIR /app
 COPY README.md pyproject.toml /app/tubescraper/
 COPY tubescraper /app/tubescraper/tubescraper
