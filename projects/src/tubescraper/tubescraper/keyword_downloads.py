@@ -10,7 +10,14 @@ import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
 from tubescraper.channel_downloads import POT_PROVIDER_URL
-from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
+from tubescraper.register import (
+    API_KEY,
+    generate_blob_path,
+    proxy_addr,
+    register_download,
+    update_cursor,
+    upload_blob,
+)
 from tubescraper.types import CORE_API, KeywordFeed
 from yt_dlp import DownloadError, ImpersonateTarget
 from yt_dlp.utils import RejectedVideoReached
@@ -132,14 +139,11 @@ def backup_keyword_entries(
                     log.debug("downloaded is none, continuing...")
                     continue
 
-                blob_path = prefix_path + str(downloaded["id"])
-
-                log.bind(blob_path=blob_path)
-                log.debug(f"uploading blob to path {blob_path}")
-                bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+                blob_path = generate_blob_path(prefix_path, downloaded)
+                upload_blob(bucket, blob_path, buf)
                 buf.close()
 
-                register_download(downloaded, org_ids)
+                register_download(downloaded, org_ids, blob_path)
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)
                 elif upload_date := downloaded.get("upload_date"):

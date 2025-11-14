@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import random
@@ -9,6 +10,7 @@ from uuid import UUID
 
 import requests
 import structlog
+from google.cloud.storage import Bucket
 from requests.exceptions import HTTPError
 from tubescraper.types import CORE_API, Cursor
 
@@ -29,6 +31,19 @@ def proxy_addr() -> str:
     return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
 
 
+def generate_blob_path(prefix_path: str, downloaded: dict[Any, Any]) -> str:
+    return (
+        prefix_path
+        + f"{downloaded['id']}.{downloaded['channel_id']}.{downloaded['timestamp']}.{downloaded['ext']}"
+    )
+
+
+def upload_blob(bucket: Bucket, blob_path: str, buf: io.BytesIO) -> None:
+    log = logger.bind(blob_path=blob_path)
+    log.debug(f"uploading blob to path {blob_path}")
+    bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
+
+
 def check_entry_exists(video_id: str) -> bool:
     query = {"metadata": f'$.youtube_id == "{video_id}"'}
     with requests.post(
@@ -42,7 +57,9 @@ def check_entry_exists(video_id: str) -> bool:
     return False
 
 
-def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
+def register_download(
+    entry: dict[Any, Any], org_ids: list[UUID], destination_path: str
+) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
@@ -63,14 +80,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         log.warning(f"we didn't download video {entry_id}, skipping")
         return None
 
-    channel_id = entry.get("channel_id", "")
-    if not channel_id:
-        log.warning(f"no channel_id set for video {entry_id}, setting it to 'unknown'")
-        channel_id = "unknown"
-
-    filename = f"{entry.get('id')}.{entry.get('channel_id')}.{entry.get('timestamp')}.{entry.get('ext')}"
-    filepath = str(STORAGE_PATH_PREFIX / channel_id / filename)
-    log = log.bind(filename=filename, filepath=filepath)
+    log = log.bind(destination_path=destination_path)
 
     uploaded_at = None
     if upload_date := entry.get("upload_date"):
@@ -81,7 +91,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         "channel_followers": entry.get("channel_follower_count"),
         "comments": entry.get("comment_count") or 0,
         "description": entry.get("description"),
-        "destination_path": filepath,
+        "destination_path": destination_path,
         "likes": entry.get("like_count") or 0,
         "platform": "youtube",
         "source_url": entry.get("webpage_url"),

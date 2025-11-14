@@ -44,7 +44,7 @@ def download_video_for_daterange(
             log.debug(f"downloading to buffer {id(buf)}")
             try:
                 downloaded = video.extract_info(
-                    f"https://tiktok.com/@{entry["channel"]}/video/{entry["id"]}"
+                    f"https://tiktok.com/@{entry['channel']}/video/{entry['id']}"
                 )
                 downloaded = cast(dict[Any, Any], downloaded)
             except RejectedVideoReached as ex:
@@ -62,18 +62,15 @@ def download_video_for_daterange(
     raise Exception("should be unreachable")
 
 
-def upload_blob(
-    bucket: Bucket, prefix_path: str, downloaded: dict[Any, Any], buf: io.BytesIO
-) -> None:
-    log = logger.bind()
-
-    # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
-    blob_path = (
+def generate_blob_path(prefix_path: str, downloaded: dict[Any, Any]) -> str:
+    return (
         prefix_path
-        + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
+        + f"{downloaded['id']}.{downloaded['channel_id']}.{downloaded['timestamp']}.{downloaded['ext']}"
     )
 
-    log = log.bind(blob_path=blob_path)
+
+def upload_blob(bucket: Bucket, blob_path: str, buf: io.BytesIO) -> None:
+    log = logger.bind(blob_path=blob_path)
     log.debug(f"uploading blob to path {blob_path}")
     bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
 
@@ -130,8 +127,9 @@ def backup_channel_entries(
             try:
                 buf = io.BytesIO()
                 downloaded, buf = download_video_for_daterange(entry, cursor, buf)
-                upload_blob(bucket, prefix_path, downloaded, buf)
-                register_download(downloaded, org_ids)
+                blob_path = generate_blob_path(prefix_path, downloaded)
+                upload_blob(bucket, blob_path, buf)
+                register_download(downloaded, org_ids, blob_path)
 
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)
