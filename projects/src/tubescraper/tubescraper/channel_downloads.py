@@ -12,7 +12,13 @@ import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-from tubescraper.register import API_KEY, proxy_addr, register_download, update_cursor
+from tubescraper.register import (
+    API_KEY,
+    proxy_addr,
+    register_download,
+    update_cursor,
+    upload_blob,
+)
 from tubescraper.types import CORE_API, ChannelFeed
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.utils import DownloadError
@@ -98,22 +104,6 @@ def download_video_for_daterange(
     raise Exception("should be unreachable")
 
 
-def upload_blob(
-    bucket: Bucket, prefix_path: str, downloaded: dict[Any, Any], buf: io.BytesIO
-) -> None:
-    log = logger.bind()
-
-    # "default": f"{output_directory}/%(id)s.%(channel_id)s.%(timestamp)s.%(ext)s"
-    blob_path = (
-        prefix_path
-        + f"{downloaded["id"]}.{downloaded["channel_id"]}.{downloaded["timestamp"]}"
-    )
-
-    log = log.bind(blob_path=blob_path)
-    log.debug(f"uploading blob to path {blob_path}")
-    bucket.blob(blob_path).upload_from_file(buf, content_type="video/mp4")
-
-
 def backup_channel_entries(
     bucket: Bucket, channel: str, cursor: datetime, org_ids: list[UUID]
 ) -> None:
@@ -178,8 +168,8 @@ def backup_channel_entries(
             try:
                 buf = io.BytesIO()
                 downloaded, buf = download_video_for_daterange(entry["id"], cursor, buf)
-                upload_blob(bucket, prefix_path, downloaded, buf)
-                register_download(downloaded, org_ids)
+                blob_path = upload_blob(bucket, prefix_path, downloaded, buf)
+                register_download(downloaded, org_ids, blob_path)
                 buf.close()
 
                 if timestamp := downloaded.get("timestamp"):
@@ -221,7 +211,7 @@ def backup_youtube_video(bucket: Bucket, info: dict[str, Any]) -> bool:
     log = logger.bind(channel_id=channel_id, filename=filename)
 
     if not filename:
-        log.error(f"filename missing for video {info.get("id")}")
+        log.error(f"filename missing for video {info.get('id')}")
         return False
 
     basename = os.path.basename(filename)

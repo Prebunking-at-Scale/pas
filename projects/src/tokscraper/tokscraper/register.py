@@ -42,7 +42,9 @@ def check_entry_exists(video_id: str) -> bool:
     return False
 
 
-def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
+def register_download(
+    entry: dict[Any, Any], org_ids: list[UUID], destination_path: str
+) -> None:
     log = logger.bind(entry=entry)
 
     if not entry:
@@ -59,18 +61,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
     except Exception:
         log.warning(f"Couldn't check if id exists {entry.get('id')}")
 
-    if not entry.get("video_ext"):
-        log.warning(f"we didn't download video {entry_id}, skipping")
-        return None
-
-    channel_id = entry.get("channel_id", "")
-    if not channel_id:
-        log.warning(f"no channel_id set for video {entry_id}, setting it to 'unknown'")
-        channel_id = "unknown"
-
-    filename = f"{entry.get('id')}.{entry.get('channel_id')}.{entry.get('timestamp')}.{entry.get('ext')}"
-    filepath = str(STORAGE_PATH_PREFIX / channel_id / filename)
-    log = log.bind(filename=filename, filepath=filepath)
+    log = log.bind(destination_path=destination_path)
 
     uploaded_at = None
     if upload_date := entry.get("upload_date"):
@@ -81,7 +72,7 @@ def register_download(entry: dict[Any, Any], org_ids: list[UUID]) -> None:
         "channel_followers": entry.get("channel_follower_count") or 0,
         "comments": entry.get("comment_count") or 0,
         "description": entry.get("description"),
-        "destination_path": filepath,
+        "destination_path": destination_path,
         "likes": entry.get("like_count") or 0,
         "platform": "tiktok",
         "source_url": entry.get("url"),
