@@ -13,7 +13,7 @@ from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.register import (
     API_KEY,
     generate_blob_path,
-    proxy_addr,
+    proxy_details,
     register_download,
     update_cursor,
     upload_blob,
@@ -42,8 +42,8 @@ def backup_keyword_entries(
     # Track the newest timestamp we've seen to update cursor at the end
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
-
-    log = log.bind(cursor=cursor, prefix_path=prefix_path)
+    proxy_addr, proxy_id = proxy_details()
+    log = log.bind(cursor=cursor, prefix_path=prefix_path, proxy_id=proxy_id)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -55,7 +55,7 @@ def backup_keyword_entries(
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
-        "proxy": proxy_addr(),
+        "proxy": proxy_addr,
         "lazy_playlist": True,
         "extract_flat": True,
         "extractor_args": {
@@ -80,7 +80,8 @@ def backup_keyword_entries(
 
         log.debug(f"{len(entries)} entries found. iterating...")
         for i, entry in enumerate(entries):
-            log.bind(entry=entry)
+            proxy_addr, proxy_id = proxy_details()
+            log.bind(entry=entry, proxy_id=proxy_id)
 
             log.info(f"processing {i} of {len(entries)} for keyword {keyword}...")
             if not entry:
@@ -100,7 +101,7 @@ def backup_keyword_entries(
                 "outtmpl": "-",
                 "logtostderr": True,
                 "format": "18",
-                "proxy": proxy_addr(),
+                "proxy": proxy_addr,
                 "extractor_args": {
                     "youtube": {
                         # "player_client": ["tv_simply"],

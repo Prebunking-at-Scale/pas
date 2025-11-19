@@ -15,7 +15,7 @@ from google.cloud.storage import Bucket
 from tubescraper.register import (
     API_KEY,
     generate_blob_path,
-    proxy_addr,
+    proxy_details,
     register_download,
     update_cursor,
     upload_blob,
@@ -68,11 +68,13 @@ def download_video_for_daterange(
         # separately, which results in the output not correctly being written to stdout
         # (something to do with subprocesses? not sure) so this is something to consider
         # when making a change here
+        proxy_addr, proxy_id = proxy_details()
+        log = log.bind(proxy_id=proxy_id)
         ctx = {
             "outtmpl": "-",
             "logtostderr": True,
             "format": "18",
-            "proxy": proxy_addr(),
+            "proxy": proxy_addr,
             "extractor_args": {
                 "youtube": {
                     # "player_client": ["tv_simply"],
@@ -117,8 +119,9 @@ def backup_channel_entries(
     # Track the newest timestamp we've seen to update cursor at the end
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / channel) + "/"
+    proxy_addr, proxy_id = proxy_details()
 
-    log = log.bind(cursor=cursor, prefix_path=prefix_path)
+    log = log.bind(cursor=cursor, prefix_path=prefix_path, proxy_id=proxy_id)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -130,7 +133,7 @@ def backup_channel_entries(
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
-        "proxy": proxy_addr(),
+        "proxy": proxy_addr,
         "lazy_playlist": True,
         "extract_flat": True,
         "extractor_args": {
