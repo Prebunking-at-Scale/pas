@@ -10,7 +10,7 @@ import requests
 import structlog
 import yt_dlp
 from google.cloud.storage import Bucket
-from tokscraper.register import API_KEY, proxy_addr, register_download, update_cursor
+from tokscraper.register import API_KEY, proxy_details, register_download, update_cursor
 from tokscraper.types import CORE_API, ChannelFeed
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.utils import DownloadError
@@ -32,11 +32,13 @@ def download_video_for_daterange(
     log = logger.bind()
 
     for attempt in range(1, 4):
+        proxy_addr, proxy_id = proxy_details()
+        log = log.bind(proxy_id=proxy_id)
         ctx = {
             "outtmpl": "-",
             "logtostderr": True,
             "format": "w*",
-            "proxy": proxy_addr(),
+            "proxy": proxy_addr,
             "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
             "break_on_reject": True,
         }
@@ -88,7 +90,8 @@ def backup_channel_entries(
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / channel) + "/"
 
-    log = log.bind(cursor=cursor, prefix_path=prefix_path)
+    proxy_addr, proxy_id = proxy_details()
+    log = log.bind(cursor=cursor, prefix_path=prefix_path, proxy_id=proxy_id)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -100,7 +103,7 @@ def backup_channel_entries(
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
-        "proxy": proxy_addr(),
+        "proxy": proxy_addr,
         "lazy_playlist": True,
         "extract_flat": True,
     }

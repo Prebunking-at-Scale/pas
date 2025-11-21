@@ -25,10 +25,13 @@ PROXY_USERNAME = os.environ["PROXY_USERNAME"]
 PROXY_PASSWORD = os.environ["PROXY_PASSWORD"]
 
 
-def proxy_addr() -> str:
+def proxy_details() -> tuple[str, int]:
     proxy_id = random.randrange(1, PROXY_COUNT, 1)
     logger.debug(f"using proxy id {proxy_id}")
-    return f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
+    return (
+        f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/",
+        proxy_id,
+    )
 
 
 def generate_blob_path(prefix_path: str, downloaded: dict[Any, Any]) -> str:

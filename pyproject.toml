@@ -14,22 +14,25 @@ members = ["projects/lib/*", "projects/src/*"]
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
-    "flake8>=7.3.0",
-    "isort>=6.0.1",
-    "memray>=1.17.2",
-    "mypy>=1.16.1",
-    "mypy-extensions>=1.1.0",
-    "pre-commit>=4.2.0",
-    "pytest>=8.4.1",
-    "pytest-asyncio>=1.0.0",
-    "pytest-cov>=6.2.1",
-    "pytest-sugar>=1.0.0",
-    "ruff>=0.12.3",
+  "black>=25.1.0",
+  "flake8>=7.3.0",
+  "isort>=6.0.1",
+  "memray>=1.17.2",
+  "mypy>=1.16.1",
+  "mypy-extensions>=1.1.0",
+  "pre-commit>=4.2.0",
+  "pytest>=8.4.1",
+  "pytest-asyncio>=1.0.0",
+  "pytest-cov>=6.2.1",
+  "pytest-sugar>=1.0.0",
+  "ruff>=0.12.3",
 ]
 
 [tool.black]
 line-length = "94"
+
+[tool.ruff]
+line-length = 94
 
 [tool.isort]
 profile = "black"
@@ -42,10 +45,7 @@ disallow_untyped_decorators = false
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = [
-  "google.*",
-  "yt_dlp",
-]
+module = ["google.*", "yt_dlp"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
