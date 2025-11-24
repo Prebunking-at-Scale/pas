@@ -124,7 +124,11 @@ def backup_keyword_entries(
                     log.error("video out of date range, skipping", exc_info=ex)
                     break  # stop iteration
                 except DownloadError as ex:
-                    log.error("yt_dlp download error, skipping", exc_info=ex)
+                    log.error(
+                        "yt_dlp download error, skipping",
+                        event_metric="download_failure",
+                        exc_info=ex,
+                    )
                     continue
                 except Exception as ex:
                     log.error(

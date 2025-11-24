@@ -151,7 +151,11 @@ def backup_channel_entries(
                 break
 
             except Exception as ex:
-                log.error("exception with downloading, skipping entry", exc_info=ex)
+                log.error(
+                    "exception with downloading, skipping entry",
+                    event_metric="download_failure",
+                    exc_info=ex,
+                )
                 continue
 
         # Update cursor once at the end with the newest timestamp seen
