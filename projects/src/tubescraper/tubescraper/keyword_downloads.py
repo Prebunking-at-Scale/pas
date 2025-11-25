@@ -148,6 +148,7 @@ def backup_keyword_entries(
                 upload_blob(bucket, blob_path, buf)
                 buf.close()
 
+                log.info("download successful", event_metric="download_success")
                 register_download(downloaded, org_ids, blob_path)
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)

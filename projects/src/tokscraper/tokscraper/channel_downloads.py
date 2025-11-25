@@ -132,6 +132,9 @@ def backup_channel_entries(
                 downloaded, buf = download_video_for_daterange(entry, cursor, buf)
                 blob_path = generate_blob_path(prefix_path, downloaded)
                 upload_blob(bucket, blob_path, buf)
+                buf.close()
+
+                log.info("download successful", event_metric="download_success")
                 register_download(downloaded, org_ids, blob_path)
 
                 if timestamp := downloaded.get("timestamp"):
