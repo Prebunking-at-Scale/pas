@@ -13,7 +13,7 @@ from tubescraper.channel_downloads import POT_PROVIDER_URL
 from tubescraper.register import (
     API_KEY,
     generate_blob_path,
-    proxy_addr,
+    proxy_details,
     register_download,
     update_cursor,
     upload_blob,
@@ -42,8 +42,8 @@ def backup_keyword_entries(
     # Track the newest timestamp we've seen to update cursor at the end
     latest_seen = cursor
     prefix_path = str(STORAGE_PATH_PREFIX / keyword) + "/"
-
-    log = log.bind(cursor=cursor, prefix_path=prefix_path)
+    proxy_addr, proxy_id = proxy_details()
+    log = log.bind(cursor=cursor, prefix_path=prefix_path, proxy_id=proxy_id)
 
     opts = {
         "daterange": yt_dlp.utils.DateRange(cursor.strftime("%Y%m%d"), "99991231"),
@@ -55,7 +55,7 @@ def backup_keyword_entries(
         "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
-        "proxy": proxy_addr(),
+        "proxy": proxy_addr,
         "lazy_playlist": True,
         "extract_flat": True,
         "extractor_args": {
@@ -80,7 +80,8 @@ def backup_keyword_entries(
 
         log.debug(f"{len(entries)} entries found. iterating...")
         for i, entry in enumerate(entries):
-            log.bind(entry=entry)
+            proxy_addr, proxy_id = proxy_details()
+            log.bind(entry=entry, proxy_id=proxy_id)
 
             log.info(f"processing {i} of {len(entries)} for keyword {keyword}...")
             if not entry:
@@ -100,7 +101,7 @@ def backup_keyword_entries(
                 "outtmpl": "-",
                 "logtostderr": True,
                 "format": "18",
-                "proxy": proxy_addr(),
+                "proxy": proxy_addr,
                 "extractor_args": {
                     "youtube": {
                         # "player_client": ["tv_simply"],
@@ -123,7 +124,11 @@ def backup_keyword_entries(
                     log.error("video out of date range, skipping", exc_info=ex)
                     break  # stop iteration
                 except DownloadError as ex:
-                    log.error("yt_dlp download error, skipping", exc_info=ex)
+                    log.error(
+                        "yt_dlp download error, skipping",
+                        event_metric="download_failure",
+                        exc_info=ex,
+                    )
                     continue
                 except Exception as ex:
                     log.error(
@@ -143,6 +148,7 @@ def backup_keyword_entries(
                 upload_blob(bucket, blob_path, buf)
                 buf.close()
 
+                log.info("download successful", event_metric="download_success")
                 register_download(downloaded, org_ids, blob_path)
                 if timestamp := downloaded.get("timestamp"):
                     dt = datetime.fromtimestamp(timestamp)
