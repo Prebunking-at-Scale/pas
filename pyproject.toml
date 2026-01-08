@@ -28,12 +28,6 @@ dev = [
   "ruff>=0.12.3",
 ]
 
-[tool.black]
-line-length = "94"
-
-[tool.ruff]
-line-length = 94
-
 [tool.isort]
 profile = "black"
 
