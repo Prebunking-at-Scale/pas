@@ -1,0 +1,13 @@
+FROM base_image
+
+COPY --from=ghcr.io/astral-sh/uv:alpine /usr/local/bin/uv /bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+WORKDIR /app
+COPY README.md pyproject.toml /app/instascraper/
+COPY instascraper /app/instascraper/instascraper
+
+RUN uv lock --no-upgrade && uv sync --all-packages --locked
+
+WORKDIR /app/instascraper
+CMD ["uv", "run", "python3", "-m", "instascraper"]

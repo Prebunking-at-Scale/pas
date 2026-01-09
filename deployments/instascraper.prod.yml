@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: instascraper
+spec:
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  schedule: 0 0/1 * * *
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: workload-identity-sa
+          containers:
+            - name: instascraper
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper:latest
+              imagePullPolicy: Always
+              resources:
+                limits:
+                  cpu: 2
+                  memory: 1G
+                requests:
+                  cpu: 1
+                  memory: 0.5G
+              env:
+                - name: STORAGE_BUCKET_NAME
+                  value: "pas-production-storage"
+                - name: APP_LOG_LEVEL
+                  value: DEBUG
+                - name: ROOT_LOG_LEVEL
+                  value: DEBUG
+                - name: API_URL
+                  value: "http://core-api:8000/api"
+                - name: API_KEYS
+                  valueFrom:
+                    secretKeyRef:
+                      name: core-api-keys
+                      key: keys
+                - name: PROXY_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: proxy-credentials
+                      key: username
+                - name: PROXY_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: proxy-credentials
+                      key: password
+                - name: PROXY_COUNT
+                  value: "50"
