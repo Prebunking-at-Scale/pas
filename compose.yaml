@@ -36,3 +36,19 @@ services:
       additional_contexts:
         base_image: "service:base_image"
     image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:dev
+
+  instascraper:
+    build:
+      context: ./projects/src/instascraper
+      dockerfile: Containerfile
+      additional_contexts:
+        base_image: "service:base_image"
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper:latest
+
+  instascraper_dev:
+    build:
+      context: ./projects/src/instascraper
+      dockerfile: Containerfile
+      additional_contexts:
+        base_image: "service:base_image"
+    image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper:dev
