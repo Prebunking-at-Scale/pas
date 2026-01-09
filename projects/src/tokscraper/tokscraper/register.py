@@ -68,7 +68,9 @@ def register_download(
 
     uploaded_at = None
     if upload_date := entry.get("upload_date"):
-        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
+        uploaded_at = datetime.strptime(upload_date, "%Y%m%d").replace(
+            tzinfo=timezone.utc
+        )
 
     data: dict[str, Any] = {
         "channel": entry.get("channel"),
@@ -81,7 +83,9 @@ def register_download(
         "source_url": entry.get("url"),
         "title": entry.get("title"),
         "uploaded_at": (
-            uploaded_at.isoformat() if isinstance(uploaded_at, datetime) else uploaded_at
+            uploaded_at.isoformat()
+            if isinstance(uploaded_at, datetime)
+            else uploaded_at
         ),
         "views": entry.get("view_count") or 0,
         "metadata": {

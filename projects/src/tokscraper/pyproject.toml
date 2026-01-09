@@ -5,14 +5,13 @@ description = "Scrapes TikTok, unsurprisingly"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "curl-cffi>=0.13.0",
     "google-cloud-storage>=3.1.1",
     "pas-log",
     "pydantic>=2.11.7",
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
     "structlog>=25.4.0",
-    "yt-dlp[default]>=2025.10.22",
+    "yt-dlp[default,curl-cffi]>=2025.12.8",
 ]
 
 [tool.uv]

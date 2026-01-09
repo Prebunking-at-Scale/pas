@@ -27,7 +27,9 @@ STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 """The bucket where tokscraper will store all it's output."""
 
 
-def channels_downloader(channel_feeds: list[ChannelFeed], storage_bucket: Bucket) -> None:
+def channels_downloader(
+    channel_feeds: list[ChannelFeed], storage_bucket: Bucket
+) -> None:
     log = logger.bind()
     channels = preprocess_channel_feeds(channel_feeds)
     for channel, orgs in channels.items():

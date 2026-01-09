@@ -46,7 +46,7 @@ def download_video_for_daterange(
             log.debug(f"downloading to buffer {id(buf)}")
             try:
                 downloaded = video.extract_info(
-                    f"https://tiktok.com/@{entry['channel']}/video/{entry['id']}"
+                    f"https://tiktok.com/@{entry['uploader']}/video/{entry['id']}"
                 )
                 downloaded = cast(dict[Any, Any], downloaded)
             except RejectedVideoReached as ex:
@@ -100,7 +100,6 @@ def backup_channel_entries(
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
         "sleep_interval_requests": 1.0,
-        "impersonate": ImpersonateTarget(client="chrome"),
         "ignoreerrors": "only_download",
         "logtostderr": True,
         "proxy": proxy_addr,
