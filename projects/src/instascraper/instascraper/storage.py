@@ -35,7 +35,7 @@ class GoogleCloudStorageClient:
         self.bucket_name = bucket_name
         self.path_prefix = path_prefix
         self.client = storage.Client()
-        self.bucket = storage.Bucket(bucket_name)
+        self.bucket = self.client.bucket(bucket_name)
 
     def upload_blob(
         self, blob_name: str, buf: io.BytesIO, content_type: str = "video/mp4"
