@@ -22,14 +22,14 @@ def scrape_channel(
             if reel.id == cursor:
                 break
 
-            if not next_cursor:
-                # The first video will be the most recent
-                next_cursor = reel.id
-
             bytes = reel.video_bytes()
             blob_name = path.join(channel, f"{reel.id}.mp4")
             blob_path = storage_client.upload_blob(blob_name, bytes)
             coreapi.register_download(reel, org_ids, blob_path)
+
+            if not next_cursor:
+                # The first video will be the most recent
+                next_cursor = reel.id
 
         except Exception as ex:
             log.error(
