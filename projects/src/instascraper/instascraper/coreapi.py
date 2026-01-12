@@ -12,8 +12,8 @@ import structlog
 from pydantic import BaseModel
 from requests.exceptions import HTTPError
 
-API_URL = os.environ["API_URL"]
-API_KEY = json.loads(os.environ["API_KEYS"])[0]
+API_URL = os.environ.get("API_URL", "http://localhost:3000/")
+API_KEY = json.loads(os.environ.get("API_KEYS", '["abc123"]'))[0]
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 

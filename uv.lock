@@ -474,6 +474,12 @@ dependencies = [
     { name = "tenacity" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "responses" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "google-cloud-storage", specifier = ">=3.4.1" },
@@ -482,6 +488,12 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.4" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "responses", specifier = ">=0.25.7" },
 ]
 
 [[package]]

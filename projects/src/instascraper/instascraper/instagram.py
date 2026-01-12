@@ -9,13 +9,16 @@ from typing import Any
 import requests
 from pydantic import BaseModel
 import structlog
-from tenacity import after_log, retry, stop_after_attempt
+from tenacity import retry, stop_after_attempt
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 PROXY_COUNT = int(os.environ.get("PROXY_COUNT", 0))
 PROXY_USERNAME = os.environ.get("PROXY_USERNAME")
 PROXY_PASSWORD = os.environ.get("PROXY_PASSWORD")
+
+SLEEP_MAX = 8
+SLEEP_MIN = 4
 
 
 class InstagramError(Exception):
@@ -52,7 +55,7 @@ def _random_proxy() -> dict[str, str] | None:
 
 
 def _random_sleep() -> None:
-    sleep_for = random.uniform(4, 8)
+    sleep_for = random.uniform(SLEEP_MIN, SLEEP_MAX)
     logger.info(f"sleeping for {sleep_for:.2f} seconds to avoid rate limits")
     time.sleep(sleep_for)
 
