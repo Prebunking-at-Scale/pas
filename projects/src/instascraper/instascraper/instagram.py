@@ -107,12 +107,10 @@ class Profile(BaseModel):
             if node.get("__typename") != "GraphVideo":
                 continue
 
-            description = (
-                node.get("edge_media_to_caption", {})
-                .get("edges", [{}])[0]
-                .get("node")
-                .get("text")
-            )
+            description = ""
+            captions = node.get("edge_media_to_caption")
+            if captions.get("edges"):
+                description = captions.get("edges")[0].get("node", {}).get("text", "")
 
             taken_at = datetime.fromtimestamp(node.get("taken_at_timestamp"))
 
