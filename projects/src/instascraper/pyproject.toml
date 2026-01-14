@@ -1,0 +1,20 @@
+[project]
+name = "instascraper"
+version = "0.1.0"
+description = "A simple scraper to pull reels for instagram users"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-cloud-storage>=3.4.1",
+    "pas-log",
+    "pydantic>=2.11.7",
+    "requests>=2.32.4",
+    "structlog>=25.4.0",
+    "tenacity>=9.1.2",
+]
+
+[tool.uv.sources]
+pas-log = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8.3.4", "responses>=0.25.7"]

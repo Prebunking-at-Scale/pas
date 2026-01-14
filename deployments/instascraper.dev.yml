@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: tokscraper
+  name: instascraper
 spec:
   concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 3
@@ -14,8 +14,8 @@ spec:
           restartPolicy: Never
           serviceAccountName: workload-identity-sa
           containers:
-            - name: tokscraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:dev
+            - name: instascraper
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper:dev
               imagePullPolicy: Always
               resources:
                 limits:
