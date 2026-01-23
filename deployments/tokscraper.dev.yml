@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: tokscraper
+  name: tokscraper-channels
 spec:
   concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 3
@@ -17,6 +17,7 @@ spec:
             - name: tokscraper
               image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:dev
               imagePullPolicy: Always
+              args: ["channels"]
               resources:
                 limits:
                   cpu: 2
@@ -50,3 +51,57 @@ spec:
                       key: password
                 - name: PROXY_COUNT
                   value: "50"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tokscraper-rescrape
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tokscraper-rescrape
+  template:
+    metadata:
+      labels:
+        app: tokscraper-rescrape
+    spec:
+      serviceAccountName: workload-identity-sa
+      containers:
+        - name: tokscraper
+          image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:dev
+          imagePullPolicy: Always
+          args: ["rescrape"]
+          resources:
+            limits:
+              cpu: 2
+              memory: 1G
+            requests:
+              cpu: 1
+              memory: 0.5G
+          env:
+            - name: STORAGE_BUCKET_NAME
+              value: "pas-prototyping-storage"
+            - name: APP_LOG_LEVEL
+              value: DEBUG
+            - name: ROOT_LOG_LEVEL
+              value: DEBUG
+            - name: API_URL
+              value: "http://core-api:8000/api"
+            - name: API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: core-api-keys
+                  key: keys
+            - name: PROXY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: username
+            - name: PROXY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-credentials
+                  key: password
+            - name: PROXY_COUNT
+              value: "50"
