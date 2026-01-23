@@ -31,14 +31,14 @@ def register_download(
     video = Video(
         platform_video_id=entry["id"],
         org_ids=org_ids,
-        channel=entry.get("channel"),
+        channel=entry.get("uploader"),
         channel_followers=entry.get("channel_follower_count", 0),
         comments=entry.get("comment_count", 0),
         description=entry.get("description"),
         destination_path=destination_path,
         likes=entry.get("like_count", 0),
         platform=PLATFORM,
-        source_url=entry.get("url"),
+        source_url=entry.get("original_url"),
         title=entry.get("title"),
         uploaded_at=uploaded_at.isoformat(),
         views=entry.get("view_count", 0),
@@ -47,17 +47,20 @@ def register_download(
     return api_client.register_video_entry(video)
 
 
-def update_video_stats(entry: dict[Any, Any]) -> bool:
+def update_video_stats(entry: dict[Any, Any], video_id: str = "") -> bool:
     """Updates the stats for a video.
 
     Returns:
         True if the stats are updated. False if not (e.g. because it doesn't exist)"""
-    video = api_client.get_video(entry["id"], PLATFORM)
-    if not video:
-        return False
+    if not video_id:
+        video = api_client.get_video(entry.get("id", ""), PLATFORM)
+        if not video:
+            logger.warn(f"could not update stats for video: {entry.get('id')}")
+            return False
+        video_id = video["id"]
 
     api_client.update_video_stats(
-        id=video["id"],
+        id=video_id,
         views=entry.get("view_count", 0),
         likes=entry.get("like_count", 0),
         comments=entry.get("comment_count", 0),

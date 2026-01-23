@@ -1,12 +1,25 @@
 from datetime import datetime
-from uuid import uuid4
+from typing import Iterable
+from uuid import UUID, uuid4
 
 import pytest
 import requests
+import responses
 from scraper_common import ChannelFeed
 
-from tubescraper.coreapi import API_URL as CORE_API
-from tubescraper.scrape_channel import fetch_channel_feeds, preprocess_channel_feeds
+from tubescraper.coreapi import api_client
+
+CORE_API = api_client.api_url
+
+
+def preprocess_channel_feeds(feeds: Iterable[ChannelFeed]) -> dict[str, list[UUID]]:
+    result: dict[str, list[UUID]] = {}
+    for feed in feeds:
+        if feed.platform != "youtube":
+            continue
+        result[feed.channel] = result.get(feed.channel, []) + [feed.organisation_id]
+
+    return result
 
 
 @pytest.fixture
@@ -55,9 +68,6 @@ def mock_channel_feeds():
     }
 
 
-import responses
-
-
 @responses.activate
 def test_fetch_channel_feeds(mock_channel_feeds):
     _ = responses.add(
@@ -67,7 +77,7 @@ def test_fetch_channel_feeds(mock_channel_feeds):
         status=200,
     )
 
-    result = fetch_channel_feeds()
+    result = api_client.fetch_channel_feeds()
 
     assert len(result) == len(mock_channel_feeds["data"])
     assert all(isinstance(feed, ChannelFeed) for feed in result)
@@ -84,13 +94,13 @@ def test_fetch_channel_feeds_empty():
     )
 
     with pytest.raises(KeyError):
-        _ = fetch_channel_feeds()
+        _ = api_client.fetch_channel_feeds()
 
 
 @responses.activate
 def test_fetch_channel_feeds_connection_error():
     with pytest.raises(requests.exceptions.ConnectionError):
-        _ = fetch_channel_feeds()
+        _ = api_client.fetch_channel_feeds()
 
 
 @responses.activate
@@ -102,7 +112,7 @@ def test_fetch_channel_feeds_model_validation(mock_channel_feeds):
         status=200,
     )
 
-    result = fetch_channel_feeds()
+    result = api_client.fetch_channel_feeds()
     assert len(result)
 
     feed = result[0]
@@ -120,7 +130,7 @@ def test_channel_feed_deduplication(mock_channel_feeds):
         status=200,
     )
 
-    feeds = fetch_channel_feeds()
+    feeds = api_client.fetch_channel_feeds()
     result = preprocess_channel_feeds(feeds)
 
     for feed in feeds:

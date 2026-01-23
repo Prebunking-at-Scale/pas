@@ -149,12 +149,15 @@ class CoreAPIClient:
     ) -> None:
         """Register a video entry with the API."""
         log = logger.bind(video_id=id)
-        data = {
-            "views": views,
-            "likes": likes,
-            "comments": comments,
-            "channel_followers": channel_followers,
-        }
+        data = {}
+        if views:
+            data["views"] = views
+        if likes:
+            data["likes"] = likes
+        if comments:
+            data["comments"] = comments
+        if channel_followers:
+            data["channel_followers"] = channel_followers
         try:
             with requests.patch(
                 f"{self.api_url}/videos/{id}",
@@ -196,3 +199,25 @@ class CoreAPIClient:
         """Make a target string safe for use in URLs."""
         target = target.replace("/", "-").strip()
         return urllib.parse.quote(target, safe="")
+
+    def get_rescrape_targets(
+        self,
+        platform: Platform,
+        min_age_hours: int = 1,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get the highest priority videos for rescraping"""
+        with requests.get(
+            f"{self.api_url}/videos/by-expected-views",
+            headers=self._headers,
+            params={
+                "platform": platform,
+                "min_age_hours": min_age_hours,
+                "limit": limit,
+            },
+        ) as resp:
+            data = resp.json()
+            videos = data.get("data")
+            if not videos:
+                return []
+            return videos

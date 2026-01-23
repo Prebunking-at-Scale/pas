@@ -2,6 +2,7 @@ import contextlib
 import io
 from collections.abc import Iterable
 from datetime import datetime
+import json
 from typing import Any, cast
 from uuid import UUID
 
@@ -18,27 +19,46 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 
 @retry(reraise=True, stop=stop_after_attempt(3))
-def download_short(url: str, buf: io.BytesIO) -> dict[Any, Any]:
+def video_details(url: str, buf: io.BytesIO | None = None) -> dict[Any, Any]:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
     log = logger.bind(proxy_id=proxy_id)
 
-    buf.seek(0)
+    download = True
+    if not buf:
+        download = False
+        buf = io.BytesIO()
+
     ctx = {
         "outtmpl": "-",
         "logtostderr": True,
         "format": "w*",
         "proxy": proxy_addr,
     }
+    buf.seek(0)
     with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
-        details = video.extract_info(url)
+        details = video.extract_info(url, download=download)
         details = cast(dict[Any, Any], details)
-    log.debug(f"video buffered. buffer size: {buf.tell()}")
+    log.debug(f"downloaded bytes: {buf.tell()}")
     buf.seek(0)
     return details
 
 
 def destination_path(downloaded: dict[Any, Any]) -> str:
     return f"{downloaded['channel_id']}/{downloaded['id']}.{downloaded['ext']}"
+
+
+def rescrape_short(video: dict[Any, Any]) -> None:
+    """Rescrape a video to update its stats."""
+    log = logger.bind(video_id=video["id"])
+    try:
+        details = video_details(video["source_url"])
+    except Exception as ex:
+        log.warning("failed to fetch video details for rescrape", exc_info=ex)
+        # Even if the above fails, we still want to update the last
+        # scrape time to prevent us from trying to scrape this
+        # video forever
+        details = {}
+    update_video_stats(details, video["id"])
 
 
 def download_channel_shorts(
@@ -66,7 +86,6 @@ def download_channel_shorts(
     with yt_dlp.YoutubeDL(opts) as ydl:
         log.info(f"fetching entries for {channel}")
         info = ydl.extract_info(f"https://tiktok.com/{channel}", download=False)
-
         if not info:
             raise ValueError("Empty info dict")
 
@@ -77,7 +96,7 @@ def download_channel_shorts(
         log.debug(f"{len(entries)} entries found..")
         for i, entry in enumerate(entries):
             log.bind(entry=entry)
-            log.info(f"processing {i} of {len(entries)} for channel {channel}...")
+            log.info(f"processing {i + 1} of {len(entries)} for channel {channel}...")
             if not entry:
                 log.info("entry is none, continuing...")
                 continue
@@ -89,7 +108,7 @@ def download_channel_shorts(
                     update_video_stats(entry)
                     continue
 
-                details = download_short(
+                details = video_details(
                     f"https://tiktok.com/{channel}/video/{entry['id']}", buf
                 )
                 blob_path = destination_path(details)

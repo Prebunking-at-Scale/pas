@@ -22,6 +22,17 @@ def destination_path(details: dict[Any, Any]) -> str:
     return f"{details['channel_id']}/{details['id']}.{details['ext']}"
 
 
+def rescrape_short(video: dict[Any, Any]) -> None:
+    try:
+        details = video_details(video["source_url"])
+    except Exception:
+        # Even if the above fails, we still want to update the last
+        # scrape time to prevent us from trying to scrape this
+        # video forever
+        details = {}
+    update_video_stats(details, video["id"])
+
+
 def scrape_shorts(
     entries: list[dict[Any, Any]],
     cursor: datetime,

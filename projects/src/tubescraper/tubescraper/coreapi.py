@@ -41,22 +41,22 @@ def register_download(
         platform_video_id=entry_id,
         org_ids=org_ids,
         channel=entry.get("uploader_id"),
-        channel_followers=entry.get("channel_follower_count"),
-        comments=entry.get("comment_count"),
+        channel_followers=entry.get("channel_follower_count") or 0,
+        comments=entry.get("comment_count") or 0,
         description=entry.get("description"),
         destination_path=destination_path,
-        likes=entry.get("like_count"),
+        likes=entry.get("like_count") or 0,
         platform=PLATFORM,
         source_url=entry.get("webpage_url"),
         title=entry.get("title"),
         uploaded_at=uploaded_at.isoformat(),
-        views=entry.get("view_count"),
+        views=entry.get("view_count") or 0,
     )
 
     return api_client.register_video_entry(video)
 
 
-def update_video_stats(entry: dict[Any, Any], video_id: UUID | None) -> bool:
+def update_video_stats(entry: dict[Any, Any], video_id: str = "") -> bool:
     """Updates the stats for a video.
 
     Returns:
@@ -68,11 +68,11 @@ def update_video_stats(entry: dict[Any, Any], video_id: UUID | None) -> bool:
         video_id = video["id"]
 
     api_client.update_video_stats(
-        id=str(video_id),
-        views=entry.get("view_count", 0),
-        likes=entry.get("like_count", 0),
-        comments=entry.get("comment_count", 0),
-        channel_followers=entry.get("channel_follower_count", 0),
+        id=video_id,
+        views=entry.get("view_count") or 0,
+        likes=entry.get("like_count") or 0,
+        comments=entry.get("comment_count") or 0,
+        channel_followers=entry.get("channel_follower_count") or 0,
     )
     return True
 

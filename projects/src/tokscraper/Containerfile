@@ -12,4 +12,5 @@ COPY tokscraper /app/tokscraper/tokscraper
 RUN uv lock --no-upgrade && uv sync --all-packages --locked
 
 WORKDIR /app/tokscraper
-CMD ["uv", "run", "python3", "-m", "tokscraper"]
+ENTRYPOINT ["uv", "run", "python3", "-m", "tokscraper"]
+CMD ["channels"]

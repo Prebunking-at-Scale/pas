@@ -5,6 +5,7 @@ description = "Scrapes TikTok, unsurprisingly"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "click>=8.1.0",
     "google-cloud-storage>=3.1.1",
     "pas-log",
     "pydantic>=2.11.7",
