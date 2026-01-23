@@ -3,8 +3,10 @@ from uuid import uuid4
 
 import pytest
 import requests
-from tubescraper.channel_downloads import fetch_channel_feeds, preprocess_channel_feeds
-from tubescraper.types import CORE_API, ChannelFeed
+from scraper_common import ChannelFeed
+
+from tubescraper.coreapi import API_URL as CORE_API
+from tubescraper.scrape_channel import fetch_channel_feeds, preprocess_channel_feeds
 
 
 @pytest.fixture
@@ -59,7 +61,10 @@ import responses
 @responses.activate
 def test_fetch_channel_feeds(mock_channel_feeds):
     _ = responses.add(
-        responses.GET, f"{CORE_API}/media_feeds/channels", json=mock_channel_feeds, status=200
+        responses.GET,
+        f"{CORE_API}/media_feeds/channels",
+        json=mock_channel_feeds,
+        status=200,
     )
 
     result = fetch_channel_feeds()
@@ -74,7 +79,9 @@ def test_fetch_channel_feeds(mock_channel_feeds):
 
 @responses.activate
 def test_fetch_channel_feeds_empty():
-    _ = responses.add(responses.GET, f"{CORE_API}/media_feeds/channels", json={}, status=200)
+    _ = responses.add(
+        responses.GET, f"{CORE_API}/media_feeds/channels", json={}, status=200
+    )
 
     with pytest.raises(KeyError):
         _ = fetch_channel_feeds()
@@ -89,7 +96,10 @@ def test_fetch_channel_feeds_connection_error():
 @responses.activate
 def test_fetch_channel_feeds_model_validation(mock_channel_feeds):
     _ = responses.add(
-        responses.GET, f"{CORE_API}/media_feeds/channels", json=mock_channel_feeds, status=200
+        responses.GET,
+        f"{CORE_API}/media_feeds/channels",
+        json=mock_channel_feeds,
+        status=200,
     )
 
     result = fetch_channel_feeds()
@@ -104,7 +114,10 @@ def test_fetch_channel_feeds_model_validation(mock_channel_feeds):
 @responses.activate
 def test_channel_feed_deduplication(mock_channel_feeds):
     _ = responses.add(
-        responses.GET, f"{CORE_API}/media_feeds/channels", json=mock_channel_feeds, status=200
+        responses.GET,
+        f"{CORE_API}/media_feeds/channels",
+        json=mock_channel_feeds,
+        status=200,
     )
 
     feeds = fetch_channel_feeds()

@@ -5,8 +5,10 @@ from uuid import uuid4
 import pytest
 import requests
 import responses
-from tubescraper.keyword_downloads import fetch_keyword_feeds, preprocess_keyword_feeds
-from tubescraper.types import CORE_API, KeywordFeed
+from scraper_common import KeywordFeed
+
+from tubescraper.coreapi import API_URL as CORE_API
+from tubescraper.scrape_keyword import fetch_keyword_feeds, preprocess_keyword_feeds
 
 
 @pytest.fixture

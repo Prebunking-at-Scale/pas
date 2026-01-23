@@ -7,6 +7,7 @@ members = [
     "instascraper",
     "pas-log",
     "prebunking-at-scale",
+    "scraper-common",
     "tokscraper",
     "tubescraper",
 ]
@@ -470,6 +471,7 @@ dependencies = [
     { name = "pas-log" },
     { name = "pydantic" },
     { name = "requests" },
+    { name = "scraper-common" },
     { name = "structlog" },
     { name = "tenacity" },
 ]
@@ -486,6 +488,7 @@ requires-dist = [
     { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "requests", specifier = ">=2.32.4" },
+    { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
 ]
@@ -1177,6 +1180,25 @@ wheels = [
 ]
 
 [[package]]
+name = "scraper-common"
+version = "0.1.0"
+source = { editable = "projects/lib/scraper_common" }
+dependencies = [
+    { name = "google-cloud-storage" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "structlog" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "google-cloud-storage", specifier = ">=3.1.1" },
+    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "requests", specifier = ">=2.32.4" },
+    { name = "structlog", specifier = ">=25.4.0" },
+]
+
+[[package]]
 name = "structlog"
 version = "25.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1229,7 +1251,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "scraper-common" },
     { name = "structlog" },
+    { name = "tenacity" },
     { name = "yt-dlp", extra = ["curl-cffi", "default"] },
 ]
 
@@ -1245,7 +1269,9 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "requests", specifier = ">=2.32.4" },
+    { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
+    { name = "tenacity", specifier = ">=9.1.2" },
     { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2025.12.8" },
 ]
 
@@ -1263,7 +1289,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "requests" },
+    { name = "scraper-common" },
     { name = "structlog" },
+    { name = "tenacity" },
     { name = "yt-dlp", extra = ["curl-cffi", "default"] },
 ]
 
@@ -1280,7 +1308,9 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "requests", specifier = ">=2.32.4" },
+    { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
+    { name = "tenacity", specifier = ">=9.1.2" },
     { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2025.12.8" },
 ]
 

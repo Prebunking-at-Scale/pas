@@ -1,0 +1,127 @@
+import contextlib
+import io
+from collections.abc import Iterable
+from datetime import datetime
+from typing import Any, cast
+from uuid import UUID
+
+import structlog
+import yt_dlp
+from scraper_common import ChannelFeed, StorageClient, proxy_config
+from tenacity import retry, stop_after_attempt
+
+from tokscraper.coreapi import register_download, update_video_stats
+
+type ChannelWatchers = dict[str, list[UUID]]
+
+logger: structlog.BoundLogger = structlog.get_logger(__name__)
+
+
+@retry(reraise=True, stop=stop_after_attempt(3))
+def download_short(url: str, buf: io.BytesIO) -> dict[Any, Any]:
+    proxy_addr, proxy_id = proxy_config.get_proxy_details()
+    log = logger.bind(proxy_id=proxy_id)
+
+    buf.seek(0)
+    ctx = {
+        "outtmpl": "-",
+        "logtostderr": True,
+        "format": "w*",
+        "proxy": proxy_addr,
+    }
+    with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
+        details = video.extract_info(url)
+        details = cast(dict[Any, Any], details)
+    log.debug(f"video buffered. buffer size: {buf.tell()}")
+    buf.seek(0)
+    return details
+
+
+def destination_path(downloaded: dict[Any, Any]) -> str:
+    return f"{downloaded['channel_id']}/{downloaded['id']}.{downloaded['ext']}"
+
+
+def download_channel_shorts(
+    channel: str,
+    cursor: datetime,
+    storage_client: StorageClient,
+    org_ids: list[UUID],
+) -> datetime | None:
+    proxy_addr, proxy_id = proxy_config.get_proxy_details()
+    log = logger.new(channel=channel, cursor=cursor, proxy_id=proxy_id)
+
+    next_cursor = None
+    opts = {
+        "playlist_items": "1:100",
+        "retries": 5,
+        "sleep_interval": 10.0,
+        "max_sleep_interval": 20.0,
+        "sleep_interval_requests": 1.0,
+        "ignoreerrors": "only_download",
+        "logtostderr": True,
+        "proxy": proxy_addr,
+        "lazy_playlist": True,
+        "extract_flat": True,
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        log.info(f"fetching entries for {channel}")
+        info = ydl.extract_info(f"https://tiktok.com/{channel}", download=False)
+
+        if not info:
+            raise ValueError("Empty info dict")
+
+        entries = info.get("entries")
+        if not isinstance(entries, list):
+            raise ValueError("No or malformed entries")
+
+        log.debug(f"{len(entries)} entries found..")
+        for i, entry in enumerate(entries):
+            log.bind(entry=entry)
+            log.info(f"processing {i} of {len(entries)} for channel {channel}...")
+            if not entry:
+                log.info("entry is none, continuing...")
+                continue
+
+            buf = io.BytesIO()
+            try:
+                timestamp = datetime.fromtimestamp(entry["timestamp"])
+                if timestamp <= cursor:
+                    update_video_stats(entry)
+                    continue
+
+                details = download_short(
+                    f"https://tiktok.com/{channel}/video/{entry['id']}", buf
+                )
+                blob_path = destination_path(details)
+                storage_client.upload_blob(blob_path, buf)
+                register_download(details, org_ids, blob_path)
+                log.info("download successful", event_metric="download_success")
+
+                if not next_cursor or timestamp > next_cursor:
+                    next_cursor = timestamp
+
+            except Exception as ex:
+                log.error(
+                    "exception with downloading, skipping entry",
+                    event_metric="download_failure",
+                    exc_info=ex,
+                )
+            finally:
+                buf.close()
+
+        return next_cursor
+
+
+def preprocess_channel_feeds(feeds: Iterable[ChannelFeed]) -> ChannelWatchers:
+    result: ChannelWatchers = {}
+    for feed in feeds:
+        if feed.platform != "tiktok":
+            continue
+
+        channel = feed.channel
+        if not channel.startswith("@"):
+            channel = f"@{channel}"
+
+        result[channel] = result.get(channel, []) + [feed.organisation_id]
+
+    return result
