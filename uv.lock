@@ -1246,6 +1246,7 @@ name = "tokscraper"
 version = "0.1.0"
 source = { editable = "projects/src/tokscraper" }
 dependencies = [
+    { name = "click" },
     { name = "google-cloud-storage" },
     { name = "pas-log" },
     { name = "pydantic" },
@@ -1264,6 +1265,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.1.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.1" },
     { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },
@@ -1284,6 +1286,7 @@ version = "0.1.0"
 source = { editable = "projects/src/tubescraper" }
 dependencies = [
     { name = "bgutil-ytdlp-pot-provider" },
+    { name = "click" },
     { name = "google-cloud-storage" },
     { name = "pas-log" },
     { name = "pydantic" },
@@ -1303,6 +1306,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bgutil-ytdlp-pot-provider", specifier = ">=1.2.2" },
+    { name = "click", specifier = ">=8.1.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.1" },
     { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },
