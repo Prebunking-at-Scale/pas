@@ -34,7 +34,7 @@ def register_download(reel: Reel, org_ids: list[UUID], destination_path: str) ->
         destination_path=destination_path,
         likes=reel.likes_count,
         platform=PLATFORM,
-        source_url=reel.video_url,
+        source_url=f"https://instagram.com/reel/{reel.shortcode}",
         title=f"Instagram video by {reel.profile.username}",
         uploaded_at=reel.timestamp,
         views=reel.view_count,
