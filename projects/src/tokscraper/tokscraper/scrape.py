@@ -66,13 +66,14 @@ def download_channel_shorts(
     cursor: datetime,
     storage_client: StorageClient,
     org_ids: list[UUID],
+    num: int = 200,
 ) -> datetime | None:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
     log = logger.new(channel=channel, cursor=cursor, proxy_id=proxy_id)
 
     next_cursor = None
     opts = {
-        "playlist_items": "1:100",
+        "playlist_items": f"1:{num}",
         "retries": 5,
         "sleep_interval": 10.0,
         "max_sleep_interval": 20.0,
