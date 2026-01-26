@@ -61,10 +61,13 @@ def scrape_shorts(
             if existing_video:
                 # If we've seen less than a 10% growth in views, don't query for likes,
                 # comments, etc.
-                previous_views = int(existing_video.get("views", 0))
+
+                # This looks odd, but some videos really do have 0 views, and that
+                # causes issues (like division by 0) and we're trying to avoid that.
+                previous_views = max(int(existing_video.get("views", 0)), 1)
                 current_views = int(entry.get("view_count", 0))
                 log.debug(f"prev views: {previous_views}, curr: {current_views}")
-                if previous_views and (current_views / previous_views) >= 1.1:
+                if current_views / previous_views >= 1.1:
                     update_video_stats(entry, existing_video["id"])
                     continue
 
