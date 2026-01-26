@@ -63,8 +63,8 @@ def scrape_shorts(
                 # comments, etc.
                 previous_views = int(existing_video.get("views", 0))
                 current_views = int(entry.get("view_count", 0))
-                log.info(f"prev views: {previous_views}, curr: {current_views}")
-                if previous_views and (current_views / previous_views) < 1.1:
+                log.debug(f"prev views: {previous_views}, curr: {current_views}")
+                if previous_views and (current_views / previous_views) >= 1.1:
                     update_video_stats(entry, existing_video["id"])
                     continue
 
@@ -83,10 +83,6 @@ def scrape_shorts(
                 storage_client.upload_blob(blob_path, buf)
                 register_download(details, org_ids, blob_path)
                 log.info("download successful", event_metric="download_success")
-
-            if existing_video:
-                update_video_stats(details, existing_video["id"])
-                log.info("updating video details", video_id=existing_video["id"])
 
         except Exception as ex:
             log.error(
