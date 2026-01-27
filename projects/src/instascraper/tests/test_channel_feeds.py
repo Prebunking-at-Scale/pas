@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import pytest
 import responses
+
 from instascraper.coreapi import (
     API_URL,
     ChannelFeed,

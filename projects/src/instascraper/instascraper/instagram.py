@@ -1,21 +1,17 @@
 import io
 import json
-from datetime import datetime
-import os
 import random
 import time
+from datetime import datetime
 from typing import Any
 
 import requests
-from pydantic import BaseModel
 import structlog
+from pydantic import BaseModel
+from scraper_common import proxy_config
 from tenacity import retry, stop_after_attempt
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
-
-PROXY_COUNT = int(os.environ.get("PROXY_COUNT", 0))
-PROXY_USERNAME = os.environ.get("PROXY_USERNAME")
-PROXY_PASSWORD = os.environ.get("PROXY_PASSWORD")
 
 SLEEP_MAX = 8
 SLEEP_MIN = 4
@@ -39,19 +35,7 @@ def _get_public_headers() -> dict:
 
 
 def _random_proxy() -> dict[str, str] | None:
-    if not PROXY_COUNT or not PROXY_USERNAME or not PROXY_PASSWORD:
-        logger.warn(
-            "PROXY_COUNT, PROXY_USERNAME or PROXY_PASSWORD unset - not using proxy"
-        )
-        return None
-
-    proxy_id = random.randrange(1, PROXY_COUNT, 1)
-    logger.info(f"using proxy id {proxy_id}")
-    proxy = f"http://{PROXY_USERNAME}-{proxy_id}:{PROXY_PASSWORD}@p.webshare.io:80/"
-    return {
-        "http": proxy,
-        "https": proxy,
-    }
+    return proxy_config.get_proxy_dict()
 
 
 def _random_sleep() -> None:

@@ -15,4 +15,5 @@ COPY tubescraper /app/tubescraper/tubescraper
 RUN uv lock --no-upgrade && uv sync --all-packages --locked
 
 WORKDIR /app/tubescraper
-CMD ["uv", "run", "python3", "-m", "tubescraper"]
+ENTRYPOINT ["uv", "run", "python3", "-m", "tubescraper"]
+CMD ["channels"]

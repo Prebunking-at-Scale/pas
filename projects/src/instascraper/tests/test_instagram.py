@@ -2,6 +2,7 @@ import io
 
 import pytest
 import responses
+
 from instascraper import instagram
 from instascraper.instagram import (
     Profile,

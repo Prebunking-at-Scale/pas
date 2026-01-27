@@ -2,12 +2,12 @@ import logging
 import os
 from uuid import UUID
 
-from instascraper import coreapi
 import structlog
 from pas_log import pas_setup_structlog
+from scraper_common import GoogleCloudStorageClient, StorageClient
 
+from instascraper import coreapi
 from instascraper.scrape import scrape_channel
-from instascraper.storage import GoogleCloudStorageClient, StorageClient
 
 STORAGE_PATH_PREFIX = "instascraper"
 STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]

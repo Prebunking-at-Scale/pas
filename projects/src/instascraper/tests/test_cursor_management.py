@@ -3,13 +3,17 @@ from uuid import uuid4
 
 import pytest
 import responses
+from requests.exceptions import HTTPError
+from scraper_common.coreapi import CoreAPIClient
+
 from instascraper.coreapi import (
     API_URL,
     fetch_cursor,
     update_cursor,
-    _make_safe_cursor_target,
 )
-from requests.exceptions import HTTPError
+
+# Access the static method from the class
+_make_safe_cursor_target = CoreAPIClient._make_safe_cursor_target
 
 
 @pytest.fixture

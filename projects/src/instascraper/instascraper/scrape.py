@@ -1,8 +1,9 @@
 from os import path
 from uuid import UUID
 
-from instascraper.storage import DiskStorageClient, StorageClient
 import structlog
+from scraper_common import DiskStorageClient, StorageClient
+
 from instascraper import coreapi, instagram
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -10,7 +11,7 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 def scrape_channel(
     channel: str, cursor: str | None, storage_client: StorageClient, org_ids: list[UUID]
-):
+) -> str | None:
     log = logger.new(cursor=cursor, channel=channel)
 
     next_cursor = None

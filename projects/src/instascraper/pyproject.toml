@@ -9,12 +9,14 @@ dependencies = [
     "pas-log",
     "pydantic>=2.11.7",
     "requests>=2.32.4",
+    "scraper-common",
     "structlog>=25.4.0",
     "tenacity>=9.1.2",
 ]
 
 [tool.uv.sources]
 pas-log = { workspace = true }
+scraper-common = { workspace = true }
 
 [dependency-groups]
 dev = ["pytest>=8.3.4", "responses>=0.25.7"]

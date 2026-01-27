@@ -11,7 +11,7 @@ COPY <<EOT /app/pyproject.toml
 members = ["*"]
 EOT
 COPY uv.lock /app/uv.lock
-COPY projects/lib/pas_log /app/pas_log
+COPY projects/lib/ /app/
 
 # RUN cd /app/pas_log && uv lock --no-upgrade &&  uv sync --all-packages --locked
 
