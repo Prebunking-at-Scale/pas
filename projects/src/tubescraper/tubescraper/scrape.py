@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -62,11 +62,15 @@ def scrape_shorts(
 
                 # This looks odd, but some videos really do have 0 views, and that
                 # causes issues (like division by 0) and we're trying to avoid that.
-                previous_views = max(int(existing_video.get("views", 0)), 1)
-                current_views = int(entry.get("view_count", 0))
+                previous_views = max(int(existing_video.get("views") or 0), 1)
+                current_views = int(entry.get("view_count") or 0)
                 log.debug(f"prev views: {previous_views}, curr: {current_views}")
                 if current_views / previous_views >= 1.1:
                     update_video_stats(entry, existing_video["id"])
+                continue
+
+            timestamp = datetime.fromtimestamp(details["timestamp"])
+            if timestamp < (cursor - timedelta(days=14)):
                 continue
 
             details = video_details(entry["id"], buf)
@@ -75,7 +79,6 @@ def scrape_shorts(
                 register_download(details, org_ids, destination_path)
                 log.info("download successful", event_metric="download_success")
 
-            timestamp = datetime.fromtimestamp(details["timestamp"])
             if not next_cursor or timestamp > next_cursor:
                 next_cursor = timestamp
 

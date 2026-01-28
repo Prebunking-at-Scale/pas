@@ -1,7 +1,7 @@
 import contextlib
 import io
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID
 
@@ -113,6 +113,10 @@ def download_channel_shorts(
                     update_video_stats(entry)
                     continue
 
+                timestamp = datetime.fromtimestamp(entry["timestamp"])
+                if timestamp < (cursor - timedelta(days=14)):
+                    continue
+
                 details = video_details(
                     f"https://tiktok.com/{channel}/video/{entry['id']}", buf
                 )
@@ -121,7 +125,6 @@ def download_channel_shorts(
                 register_download(details, org_ids, destination_path)
                 log.info("download successful", event_metric="download_success")
 
-                timestamp = datetime.fromtimestamp(entry["timestamp"])
                 if not next_cursor or timestamp > next_cursor:
                     next_cursor = timestamp
 
