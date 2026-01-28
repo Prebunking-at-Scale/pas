@@ -22,7 +22,7 @@ from tubescraper.youtube import channel_shorts, id_for_channel, keyword_shorts
 
 type TargetOrgMapping = dict[str, list[UUID]]
 
-SHORTS_PER_TARGET = 50
+SHORTS_PER_TARGET = 100
 STORAGE_BUCKET_NAME = os.environ["STORAGE_BUCKET_NAME"]
 STORAGE_PATH_PREFIX = "tubescraper"
 
