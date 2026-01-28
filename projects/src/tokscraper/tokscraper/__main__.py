@@ -48,7 +48,7 @@ def rescrape_shorts() -> None:
                     exc_info=ex,
                 )
                 continue
-        time.sleep(60)
+            time.sleep(3)
 
 
 def channels_downloader(
