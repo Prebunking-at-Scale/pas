@@ -53,8 +53,8 @@ def scrape_shorts(
         # videos until we reach the cursor (or something older than it). We
         # can however stop if we've seen a video before
         existing_video = api_client.get_video(entry["id"], PLATFORM)
+        max_age_reached = False
         buf = io.BytesIO() if not existing_video else None
-
         try:
             if existing_video:
                 # If we've seen less than a 10% growth in views, don't query for likes,
@@ -67,13 +67,23 @@ def scrape_shorts(
                 log.debug(f"prev views: {previous_views}, curr: {current_views}")
                 if current_views / previous_views >= 1.1:
                     update_video_stats(entry, existing_video["id"])
+
+                timestamp = datetime.fromisoformat(existing_video["uploaded_at"])
+                if timestamp < (cursor - timedelta(days=14)):
+                    max_age_reached = True
                 continue
 
-            timestamp = datetime.fromtimestamp(details["timestamp"])
-            if timestamp < (cursor - timedelta(days=14)):
+            if max_age_reached:
+                # Dont download anything new, but keep looking so we can update
+                # any stats for videos we already have
                 continue
 
             details = video_details(entry["id"], buf)
+            timestamp = datetime.fromtimestamp(details["timestamp"])
+            if timestamp < (cursor - timedelta(days=14)):
+                max_age_reached = True
+                continue
+
             if buf:
                 destination_path = storage_client.upload_blob(blob_name(details), buf)
                 register_download(details, org_ids, destination_path)
