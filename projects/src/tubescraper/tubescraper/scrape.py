@@ -18,7 +18,7 @@ from tubescraper.youtube import video_details
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 
-def destination_path(details: dict[Any, Any]) -> str:
+def blob_name(details: dict[Any, Any]) -> str:
     return f"{details['channel_id']}/{details['id']}.{details['ext']}"
 
 
@@ -44,7 +44,6 @@ def scrape_shorts(
     next_cursor = None
 
     log.debug(f"{len(entries)} shorts found for {target}")
-    download = True
     for i, entry in enumerate(entries):
         log.bind(entry=entry)
         log.info(f"processing {i + 1} of {len(entries)} for {target}...")
@@ -54,8 +53,7 @@ def scrape_shorts(
         # videos until we reach the cursor (or something older than it). We
         # can however stop if we've seen a video before
         existing_video = api_client.get_video(entry["id"], PLATFORM)
-        download = download and not existing_video
-        buf = io.BytesIO() if download else None
+        buf = io.BytesIO() if not existing_video else None
 
         try:
             if existing_video:
@@ -69,23 +67,17 @@ def scrape_shorts(
                 log.debug(f"prev views: {previous_views}, curr: {current_views}")
                 if current_views / previous_views >= 1.1:
                     update_video_stats(entry, existing_video["id"])
-                    continue
+                continue
 
             details = video_details(entry["id"], buf)
-            timestamp = datetime.fromtimestamp(details["timestamp"])
-            if timestamp <= cursor:
-                # Stop further video downloads if we're at the cursor value,
-                # but continue re-scraping metadata
-                download = False
+            if buf:
+                destination_path = storage_client.upload_blob(blob_name(details), buf)
+                register_download(details, org_ids, destination_path)
+                log.info("download successful", event_metric="download_success")
 
+            timestamp = datetime.fromtimestamp(details["timestamp"])
             if not next_cursor or timestamp > next_cursor:
                 next_cursor = timestamp
-
-            if not existing_video and buf:
-                blob_path = destination_path(details)
-                storage_client.upload_blob(blob_path, buf)
-                register_download(details, org_ids, blob_path)
-                log.info("download successful", event_metric="download_success")
 
         except Exception as ex:
             log.error(

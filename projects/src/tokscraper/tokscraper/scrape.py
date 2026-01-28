@@ -47,8 +47,8 @@ def video_details(url: str, buf: io.BytesIO | None = None) -> dict[Any, Any]:
     return details
 
 
-def destination_path(downloaded: dict[Any, Any]) -> str:
-    return f"{downloaded['channel_id']}/{downloaded['id']}.{downloaded['ext']}"
+def blob_name(channel_name, downloaded: dict[Any, Any]) -> str:
+    return f"{channel_name}/{downloaded['id']}.{downloaded['ext']}"
 
 
 def rescrape_short(video: dict[Any, Any]) -> None:
@@ -116,9 +116,9 @@ def download_channel_shorts(
                 details = video_details(
                     f"https://tiktok.com/{channel}/video/{entry['id']}", buf
                 )
-                blob_path = destination_path(details)
-                storage_client.upload_blob(blob_path, buf)
-                register_download(details, org_ids, blob_path)
+                destination_path = blob_name(channel, details)
+                destination_path = storage_client.upload_blob(destination_path, buf)
+                register_download(details, org_ids, destination_path)
                 log.info("download successful", event_metric="download_success")
 
                 timestamp = datetime.fromtimestamp(entry["timestamp"])
