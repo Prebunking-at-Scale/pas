@@ -2,7 +2,6 @@ import contextlib
 import io
 from collections.abc import Iterable
 from datetime import datetime
-import json
 from typing import Any, cast
 from uuid import UUID
 
@@ -11,7 +10,12 @@ import yt_dlp
 from scraper_common import ChannelFeed, StorageClient, proxy_config
 from tenacity import retry, stop_after_attempt
 
-from tokscraper.coreapi import register_download, update_video_stats
+from tokscraper.coreapi import (
+    PLATFORM,
+    api_client,
+    register_download,
+    update_video_stats,
+)
 
 type ChannelWatchers = dict[str, list[UUID]]
 
@@ -104,8 +108,8 @@ def download_channel_shorts(
 
             buf = io.BytesIO()
             try:
-                timestamp = datetime.fromtimestamp(entry["timestamp"])
-                if timestamp <= cursor:
+                existing_video = api_client.get_video(entry["id"], PLATFORM)
+                if existing_video:
                     update_video_stats(entry)
                     continue
 
@@ -117,6 +121,7 @@ def download_channel_shorts(
                 register_download(details, org_ids, blob_path)
                 log.info("download successful", event_metric="download_success")
 
+                timestamp = datetime.fromtimestamp(entry["timestamp"])
                 if not next_cursor or timestamp > next_cursor:
                     next_cursor = timestamp
 
