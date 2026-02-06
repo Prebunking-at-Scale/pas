@@ -3,6 +3,7 @@ name: Build and Push Docker Images
 on:
   push:
     branches: [main, dev]
+  workflow_dispatch:
 
 env:
   REGISTRY: europe-west4-docker.pkg.dev/pas-shared/pas
@@ -13,13 +14,14 @@ jobs:
     permissions:
       contents: read
     outputs:
-      base: ${{ steps.filter.outputs.base }}
-      tubescraper: ${{ steps.filter.outputs.tubescraper }}
-      tokscraper: ${{ steps.filter.outputs.tokscraper }}
-      instascraper: ${{ steps.filter.outputs.instascraper }}
+      base: ${{ steps.filter.outputs.base || github.event_name == 'workflow_dispatch' }}
+      tubescraper: ${{ steps.filter.outputs.tubescraper || github.event_name == 'workflow_dispatch' }}
+      tokscraper: ${{ steps.filter.outputs.tokscraper || github.event_name == 'workflow_dispatch' }}
+      instascraper: ${{ steps.filter.outputs.instascraper || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
