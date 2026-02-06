@@ -136,7 +136,7 @@ jobs:
           build-contexts: base_image=docker-image://${{ env.REGISTRY }}/base_image:latest
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ matrix.name }}:${{ steps.tag_version.outputs.new_tag }}
+            ${{ env.REGISTRY }}/${{ matrix.name }}:v${{ steps.tag_version.outputs.new_version }}
             ${{ env.REGISTRY }}/${{ matrix.name }}:${{ github.ref_name == 'main' && 'latest' || 'dev' }}
 
       - name: Create GitHub release
