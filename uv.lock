@@ -434,10 +434,10 @@ name = "instascraper"
 version = "0.1.0"
 source = { virtual = "projects/src/instascraper" }
 dependencies = [
+    { name = "curl-cffi" },
     { name = "google-cloud-storage" },
     { name = "pas-log" },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "scraper-common" },
     { name = "structlog" },
     { name = "tenacity" },
@@ -446,25 +446,21 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
-    { name = "responses" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "curl-cffi", specifier = ">=0.7" },
     { name = "google-cloud-storage", specifier = ">=3.4.1" },
     { name = "pas-log", editable = "projects/lib/pas_log" },
     { name = "pydantic", specifier = ">=2.11.7" },
-    { name = "requests", specifier = ">=2.32.4" },
     { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.3.4" },
-    { name = "responses", specifier = ">=0.25.7" },
-]
+dev = [{ name = "pytest", specifier = ">=8.3.4" }]
 
 [[package]]
 name = "jinja2"

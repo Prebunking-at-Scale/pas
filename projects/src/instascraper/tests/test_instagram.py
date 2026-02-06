@@ -1,7 +1,7 @@
 import io
+from unittest.mock import MagicMock, patch
 
 import pytest
-import responses
 from instascraper import instagram
 from instascraper.instagram import (
     Profile,
@@ -9,8 +9,6 @@ from instascraper.instagram import (
     fetch_profile,
 )
 
-# Disable random sleeps - we're mocking the requests so no need to add
-# delays between them!
 instagram.SLEEP_MAX = 0
 instagram.SLEEP_MIN = 0
 
@@ -101,17 +99,24 @@ def mock_profile():
     )
 
 
-@responses.activate
-def test_fetch_profile_success(mock_instagram_user):
-    username = "test_user"
-    _ = responses.add(
-        responses.GET,
-        f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
-        json=mock_instagram_user,
-        status=200,
-    )
+def _mock_session_with_response(json_data=None, content=None, status_code=200):
+    session = MagicMock()
+    response = MagicMock()
+    response.status_code = status_code
+    response.raise_for_status = MagicMock()
+    if json_data is not None:
+        response.json.return_value = json_data
+    if content is not None:
+        response.content = content
+    session.get.return_value = response
+    return session
 
-    profile = fetch_profile(username)
+
+@patch("instascraper.instagram._new_session")
+def test_fetch_profile_success(mock_new_session, mock_instagram_user):
+    mock_new_session.return_value = _mock_session_with_response(json_data=mock_instagram_user)
+
+    profile = fetch_profile("test_user")
 
     assert isinstance(profile, Profile)
     assert profile.id == "123456789"
@@ -147,7 +152,6 @@ def test_profile_reels_filters_non_videos(mock_instagram_user):
 
     reels = profile.reels
 
-    # Should only have 2 videos, not the image
     assert len(reels) == 2
     assert all(isinstance(reel, Reel) for reel in reels)
     assert all(reel.id != "3364843860104643555" for reel in reels)
@@ -186,10 +190,10 @@ def test_profile_reels_empty_description():
     assert reels[0].description == ""
 
 
-@responses.activate
-def test_reel_video_bytes():
+@patch("instascraper.instagram._new_session")
+def test_reel_video_bytes(mock_new_session):
     mock_video_content = b"fake video content"
-    video_url = "https://example.com/video.mp4"
+    mock_new_session.return_value = _mock_session_with_response(content=mock_video_content)
 
     profile = Profile(
         id="123456789",
@@ -209,11 +213,9 @@ def test_reel_video_bytes():
         comment_count=50,
         timestamp="2024-01-01T00:00:00",
         description="Test video",
-        video_url=video_url,
+        video_url="https://example.com/video.mp4",
         raw={},
     )
-
-    _ = responses.add(responses.GET, video_url, body=mock_video_content, status=200)
 
     result = reel.video_bytes()
 

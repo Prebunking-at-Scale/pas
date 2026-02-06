@@ -5,12 +5,12 @@ import time
 from datetime import datetime
 from typing import Any
 
-import requests
 import structlog
+from curl_cffi.requests import Session
 from pydantic import BaseModel
 from scraper_common import proxy_config
 from structlog.contextvars import bind_contextvars
-from tenacity import retry, stop_after_attempt
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -23,10 +23,7 @@ class InstagramError(Exception):
 
 
 def _get_public_headers() -> dict:
-    """Some sensible default headers for public Instagram API requests."""
     return {
-        # This is the usage agent for a Google Home Hub Max...
-        "User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 CrKey/1.54.250320",
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
         "X-IG-App-ID": "936619743392459",
@@ -35,19 +32,34 @@ def _get_public_headers() -> dict:
     }
 
 
-def _random_proxy() -> dict[str, str] | None:
+def _random_proxy() -> str | None:
     if not proxy_config.is_configured:
         logger.warning("proxy not configured - not using proxy")
         return None
     proxy_url, proxy_id = proxy_config.get_proxy_details()
     bind_contextvars(proxy_id=proxy_id)
-    return {"http": proxy_url, "https": proxy_url}
+    return proxy_url
 
 
 def _random_sleep() -> None:
     sleep_for = random.uniform(SLEEP_MIN, SLEEP_MAX)
     logger.info(f"sleeping for {sleep_for:.2f} seconds to avoid rate limits")
     time.sleep(sleep_for)
+
+
+def _new_session() -> Session:
+    session = Session(impersonate="chrome")
+    session.headers.update(_get_public_headers())
+    proxy = _random_proxy()
+    if proxy:
+        session.proxies = {"http": proxy, "https": proxy}
+    logger.info("warming up session with instagram.com")
+    resp = session.get("https://www.instagram.com/", timeout=10)
+    resp.raise_for_status()
+    csrf = session.cookies.get("csrftoken")
+    if csrf:
+        session.headers["X-CSRFToken"] = csrf
+    return session
 
 
 class Reel(BaseModel):
@@ -62,16 +74,12 @@ class Reel(BaseModel):
     video_url: str
     raw: dict[str, Any]
 
-    @retry(reraise=True, stop=stop_after_attempt(3))
+    @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=10, max=60))
     def video_bytes(self) -> io.BytesIO:
         logger.info("fetching video", user=self.profile.username, video_id=self.id)
         _random_sleep()
-        resp = requests.get(
-            self.video_url,
-            headers=_get_public_headers(),
-            proxies=_random_proxy(),
-            timeout=600,
-        )
+        session = _new_session()
+        resp = session.get(self.video_url, timeout=600)
         resp.raise_for_status()
         return io.BytesIO(resp.content)
 
@@ -125,15 +133,13 @@ class Profile(BaseModel):
         return reels
 
 
-@retry(reraise=True, stop=stop_after_attempt(3))
+@retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=10, max=60))
 def fetch_profile(username: str) -> Profile:
-    """Fetch user data including media using public web API (no authentication required)."""
     logger.info("fetching profile", username=username)
     _random_sleep()
-    resp = requests.get(
+    session = _new_session()
+    resp = session.get(
         f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
-        headers=_get_public_headers(),
-        proxies=_random_proxy(),
         timeout=10,
     )
     resp.raise_for_status()
