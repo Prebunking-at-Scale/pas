@@ -18,55 +18,112 @@ from the repository root.
 
 ### Building the Scrapers
 
-All three scrapers (instascraper, tokscraper, tubescraper) share a common base Docker image defined in the root `Containerfile`. This base image:
+All three scrapers (instascraper, tokscraper, tubescraper) share a common base Docker image defined in the root `Containerfile`. Each scraper has its own Containerfile in `projects/src/<scraper>/`.
 
-- Uses Python 3.13-alpine
-- Installs build essentials and the `uv` package manager
-- Sets up the workspace with common dependencies
+Images are built and pushed automatically by the **Build and Push Docker Images** workflow (`.github/workflows/build-images.yml`).
 
-#### Building the Base Image
+#### When builds run
 
-First, build the base image that all scrapers depend on:
+- On every push to `main` or `dev`
+- On manual trigger via `workflow_dispatch`
+
+The workflow uses path filtering to only rebuild what changed:
+
+| Change | What rebuilds |
+|--------|---------------|
+| `Containerfile`, `pyproject.toml`, `uv.lock`, `projects/lib/**` | Base image + all scrapers |
+| `projects/src/tubescraper/**` | tubescraper only |
+| `projects/src/tokscraper/**` | tokscraper only |
+| `projects/src/instascraper/**` | instascraper only |
+
+Manual triggers (`workflow_dispatch`) rebuild everything.
+
+#### Tagging
+
+Each scraper image is automatically tagged with:
+- A semver version tag (e.g. `v1.2.3`) — bumped automatically per scraper
+- `latest` for builds from `main`, `dev` for builds from `dev`
+
+Tags follow the format `<scraper>/vX.Y.Z` (e.g. `tubescraper/v0.5.0`). A GitHub release is created for each build.
+
+#### Images
+
+All images are pushed to Google Artifact Registry:
+
+```
+europe-west4-docker.pkg.dev/pas-shared/pas/<scraper>:<tag>
+```
+
+#### Building locally
+
+You can still build locally with docker compose for development:
 
 ```bash
 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t base_image .
-```
-
-#### Building Individual Scrapers
-
-Each scraper has its own Containerfile in `projects/src/<scraper>/`. Build them using docker compose:
-
-```bash
-# Build all scrapers
 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
-
-# Or build individually
-DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build instascraper
-DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build tokscraper
-DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build tubescraper
 ```
 
 **Note:** The `tokscraper` and `tubescraper` images include additional system dependencies (`ffmpeg` and `deno`) required by `yt-dlp` for video downloading.
 
 ### Deployment
 
-To deploy a project currently requires a few steps:
+Deployments use [Kustomize](https://kustomize.io/) with base manifests in `deployments/base/` and environment overlays in `deployments/dev/` and `deployments/prod/`.
 
-* Write a Containerfile (Dockerfile) for the project in it's directory under `projects/src/`
-* Add the project to `compose.yaml`
-* Build the image for the project with the name you added to the compose file with `<podman, docker> compose build <project>`
-* Push the built image with `<podman, docker> push europe-west4-docker.pkg.dev/pas-shared/pas/<project>:<tag>` *make sure the tag is correct!*
-* Write a Kubernetes manifest for the project under `deployments/`
-* Apply that manifest with `kubectl apply -f <manifest>`
+#### Automatic deployment to dev
 
-So for example to deploy `tubescraper` to production:
+Pushes to the `dev` branch automatically deploy to the dev cluster after images are built. This is handled by the `deploy-dev` job in the build workflow. It runs `kubectl apply -k deployments/dev` and restarts the rescrape deployments.
 
+#### Manual deployment (production and dev)
+
+Use the **Deploy Scraper** workflow (`.github/workflows/deploy.yml`) via GitHub Actions:
+
+1. Go to **Actions > Deploy Scraper > Run workflow**
+2. Select the scraper to deploy (`tubescraper`, `tokscraper`, or `instascraper`)
+3. Optionally provide a git tag (e.g. `tubescraper/v0.5.0`)
+   - If no tag is provided, it deploys the latest production release (the highest non-prerelease tag)
+   - Tags with a prerelease suffix (e.g. `v0.5.0-beta.1`) deploy to **dev**
+   - Tags without a prerelease suffix (e.g. `v0.5.0`) deploy to **prod**
+
+The workflow sets the image tag via kustomize and applies the appropriate overlay (`deployments/dev/` or `deployments/prod/`) to the corresponding GKE cluster.
+
+#### Environments
+
+| Environment | GCP Project | Cluster | Triggered by |
+|-------------|-------------|---------|--------------|
+| dev | pas-development-1 | dev-cluster | Push to `dev` branch, or manual deploy with prerelease tag |
+| prod | pas-production-1 | prod-cluster | Manual deploy with release tag |
+
+#### Manual deployment with kustomize
+
+If you need to deploy without GitHub Actions (e.g. for debugging or urgent fixes), you can apply the kustomize overlays directly.
+
+1. Get credentials for the target cluster:
+
+```bash
+# Dev
+gcloud container clusters get-credentials dev-cluster --project pas-development-1 --location europe-west4-b
+
+# Prod
+gcloud container clusters get-credentials prod-cluster --project pas-production-1 --location europe-west4-b
 ```
-$ gcloud container clusters get-credentials prod-cluster --project pas-production-1 --location europe-west4-b
-$ DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build tubescraper
-$ docker push europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
-$ kubectl apply -f deployments/tubescraper.prod.yml # optional, only if you've changed it
+
+2. To deploy all scrapers at the default image tag (`latest` for prod, `dev` for dev):
+
+```bash
+kubectl apply -k deployments/prod
+# or
+kubectl apply -k deployments/dev
 ```
+
+3. To deploy a specific version of a single scraper, use `kustomize edit set image` to override the tag before applying:
+
+```bash
+cd deployments/prod
+kustomize edit set image europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:v1.2.3
+kubectl apply -k .
+```
+
+**Note:** `kustomize edit set image` modifies `kustomization.yaml` in place. Avoid committing these local tag overrides — they are managed by CI during normal deployments.
 
 ---
 
