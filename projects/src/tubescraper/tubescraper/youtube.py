@@ -6,6 +6,7 @@ from typing import Any, cast
 import structlog
 import yt_dlp
 from scraper_common import proxy_config
+from structlog.contextvars import bind_contextvars
 from tenacity import retry, stop_after_attempt
 from yt_dlp.networking.impersonate import ImpersonateTarget
 
@@ -15,7 +16,8 @@ POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "")
 
 
 def id_for_channel(s: str) -> str:
-    proxy_addr, _ = proxy_config.get_proxy_details()
+    proxy_addr, proxy_id = proxy_config.get_proxy_details()
+    bind_contextvars(proxy_id=proxy_id)
     opts = {
         "extract_flat": False,
         "proxy": proxy_addr,
@@ -43,7 +45,7 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
     """fetch channel video entries"""
 
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    log = logger.new(proxy_id=proxy_id)
+    bind_contextvars(proxy_id=proxy_id)
 
     opts = {
         "playlist_items": f"1:{num}",
@@ -62,7 +64,7 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
         },
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
-        log.info(f"fetching entries for {channel_id}")
+        logger.info(f"fetching entries for {channel_id}")
         info = ydl.extract_info(
             f"https://youtube.com/channel/{channel_id}/shorts",
             download=False,
@@ -84,7 +86,7 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
 @retry(reraise=True, stop=stop_after_attempt(3))
 def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    log = logger.new(proxy_id=proxy_id)
+    bind_contextvars(proxy_id=proxy_id)
 
     opts = {
         "playlist_items": f"1:{num}",
@@ -103,7 +105,7 @@ def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
         },
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
-        log.info(f"downloading entries for {keyword}")
+        logger.info(f"downloading entries for {keyword}")
         info = ydl.extract_info(
             # the sp parameter is a pre-computed search query that only matches shorts
             # uploaded in the last week
@@ -127,7 +129,7 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
     """Get details about a video. If buf is specified, download the video file
     into the buffer."""
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    log = logger.new(proxy_id=proxy_id)
+    bind_contextvars(proxy_id=proxy_id)
 
     download = True
     if not buf:
@@ -158,6 +160,6 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
     with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
         details = video.extract_info(entry_id, download=download)
         details = cast(dict[Any, Any], details)
-    log.debug(f"downloaded bytes: {buf.tell()}")
+    logger.debug(f"downloaded bytes: {buf.tell()}")
     buf.seek(0)
     return details

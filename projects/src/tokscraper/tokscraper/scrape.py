@@ -8,6 +8,7 @@ from uuid import UUID
 import structlog
 import yt_dlp
 from scraper_common import ChannelFeed, StorageClient, proxy_config
+from structlog.contextvars import bind_contextvars
 from tenacity import retry, stop_after_attempt
 
 from tokscraper.coreapi import (
@@ -25,7 +26,7 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 @retry(reraise=True, stop=stop_after_attempt(3))
 def video_details(url: str, buf: io.BytesIO | None = None) -> dict[Any, Any]:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    log = logger.bind(proxy_id=proxy_id)
+    bind_contextvars(proxy_id=proxy_id)
 
     download = True
     if not buf:
@@ -42,7 +43,7 @@ def video_details(url: str, buf: io.BytesIO | None = None) -> dict[Any, Any]:
     with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
         details = video.extract_info(url, download=download)
         details = cast(dict[Any, Any], details)
-    log.debug(f"downloaded bytes: {buf.tell()}")
+    logger.debug(f"downloaded bytes: {buf.tell()}")
     buf.seek(0)
     return details
 
@@ -73,7 +74,8 @@ def download_channel_shorts(
     num: int = 200,
 ) -> datetime | None:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    log = logger.new(channel=channel, cursor=cursor, proxy_id=proxy_id)
+    bind_contextvars(proxy_id=proxy_id)
+    log = logger.new(channel=channel, cursor=cursor)
 
     next_cursor = None
     opts = {

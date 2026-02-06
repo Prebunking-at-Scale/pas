@@ -9,6 +9,7 @@ import requests
 import structlog
 from pydantic import BaseModel
 from scraper_common import proxy_config
+from structlog.contextvars import bind_contextvars
 from tenacity import retry, stop_after_attempt
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -35,7 +36,12 @@ def _get_public_headers() -> dict:
 
 
 def _random_proxy() -> dict[str, str] | None:
-    return proxy_config.get_proxy_dict()
+    if not proxy_config.is_configured:
+        logger.warning("proxy not configured - not using proxy")
+        return None
+    proxy_url, proxy_id = proxy_config.get_proxy_details()
+    bind_contextvars(proxy_id=proxy_id)
+    return {"http": proxy_url, "https": proxy_url}
 
 
 def _random_sleep() -> None:
