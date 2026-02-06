@@ -8,15 +8,6 @@ updates:
   - package-ecosystem: "uv"
     allow:
       - dependency-name: "yt-dlp"
-    directories:
-      - "/projects/src/*"
-      - "/projects/lib/*"
+    directory: "/"
     schedule:
       interval: "daily"
-      
-  - package-ecosystem: "docker"
-    directories:
-      - "/"
-      - "/projects/src/*"
-    schedule:
-      interval: "weekly"
