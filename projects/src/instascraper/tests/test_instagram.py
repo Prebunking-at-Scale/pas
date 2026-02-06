@@ -2,7 +2,6 @@ import io
 
 import pytest
 import responses
-
 from instascraper import instagram
 from instascraper.instagram import (
     Profile,
@@ -39,9 +38,7 @@ def mock_instagram_user():
                                 "taken_at_timestamp": 1704067200,
                                 "video_url": "https://example.com/video.mp4",
                                 "edge_media_to_caption": {
-                                    "edges": [
-                                        {"node": {"text": "Test video description"}}
-                                    ]
+                                    "edges": [{"node": {"text": "Test video description"}}]
                                 },
                             }
                         },

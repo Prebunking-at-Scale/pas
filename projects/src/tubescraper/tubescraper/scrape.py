@@ -14,7 +14,6 @@ from tubescraper.coreapi import (
 )
 from tubescraper.youtube import video_details
 
-
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 

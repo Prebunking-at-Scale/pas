@@ -72,9 +72,7 @@ def channels_downloader(
             channel_id = id_for_channel(channel)
             cursor = fetch_cursor(channel_id)
             entries = channel_shorts(channel_id, SHORTS_PER_TARGET)
-            next_cursor = scrape_shorts(
-                entries, cursor, storage_client, channel_id, orgs
-            )
+            next_cursor = scrape_shorts(entries, cursor, storage_client, channel_id, orgs)
             if next_cursor:
                 update_cursor(channel, next_cursor)
         except ValueError as ex:
@@ -106,9 +104,7 @@ def keywords_downloader(
         try:
             cursor = fetch_cursor(keyword)
             entries = keyword_shorts(keyword, SHORTS_PER_TARGET)
-            next_cursor = scrape_shorts(
-                entries, cursor, storage_client, keyword, org_ids
-            )
+            next_cursor = scrape_shorts(entries, cursor, storage_client, keyword, org_ids)
             if next_cursor:
                 update_cursor(keyword, next_cursor)
         except ValueError as ex:
@@ -125,9 +121,7 @@ def rescrape_shorts() -> None:
 
     while True:
         log.info("starting new re-scrape pass")
-        for target in api_client.get_rescrape_targets(
-            PLATFORM, min_age_hours=1, limit=100
-        ):
+        for target in api_client.get_rescrape_targets(PLATFORM, min_age_hours=1, limit=100):
             try:
                 log.info(f"rescraping {target['id']}")
                 rescrape_short(target)

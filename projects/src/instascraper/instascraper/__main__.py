@@ -20,9 +20,7 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 type ChannelWatchers = dict[str, list[UUID]]
 
 
-def channels_downloader(
-    channels: ChannelWatchers, storage_client: StorageClient
-) -> None:
+def channels_downloader(channels: ChannelWatchers, storage_client: StorageClient) -> None:
     for channel, orgs in channels.items():
         log = logger.new(channel_name=channel)
         log.info(f"archiving a new channel: {channel}")
@@ -32,9 +30,7 @@ def channels_downloader(
             if next_cursor:
                 coreapi.update_cursor(channel, next_cursor)
         except Exception as ex:
-            log.error(
-                "unexpected error processing channel", media_feed=channel, exc_info=ex
-            )
+            log.error("unexpected error processing channel", media_feed=channel, exc_info=ex)
 
 
 def channel_feeds() -> ChannelWatchers:

@@ -6,7 +6,6 @@ import pytest
 import requests
 import responses
 from scraper_common import KeywordFeed
-
 from tubescraper.coreapi import api_client
 
 CORE_API = api_client.api_url

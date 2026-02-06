@@ -66,9 +66,7 @@ class CoreAPIClient:
                 return None
             raise ex
 
-    def update_cursor(
-        self, target: str, platform: Platform, cursor: dict[str, Any]
-    ) -> None:
+    def update_cursor(self, target: str, platform: Platform, cursor: dict[str, Any]) -> None:
         """Updates the stored cursor for a given target and platform.
 
         Args:
@@ -87,9 +85,7 @@ class CoreAPIClient:
         ) as resp:
             resp.raise_for_status()
 
-    def get_video(
-        self, platform_video_id: str, platform: Platform
-    ) -> dict[str, Any] | None:
+    def get_video(self, platform_video_id: str, platform: Platform) -> dict[str, Any] | None:
         """Check if a video entry already exists in the API."""
         id_field = f"{platform}_id"
         query = {"metadata": f'$.{id_field} == "{platform_video_id}"'}
@@ -114,9 +110,7 @@ class CoreAPIClient:
 
     def _build_api_payload(self, video: Video) -> dict[str, Any]:
         """Build the API payload from a Video, constructing metadata."""
-        data = video.model_dump(
-            mode="json", exclude={"id", "platform_video_id", "org_ids"}
-        )
+        data = video.model_dump(mode="json", exclude={"id", "platform_video_id", "org_ids"})
         data["metadata"] = {
             "for_organisation": [str(org_id) for org_id in video.org_ids],
             f"{video.platform}_id": video.platform_video_id,

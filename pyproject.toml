@@ -14,9 +14,6 @@ members = ["projects/lib/*", "projects/src/*"]
 
 [dependency-groups]
 dev = [
-  "black>=25.1.0",
-  "flake8>=7.3.0",
-  "isort>=6.0.1",
   "memray>=1.17.2",
   "mypy>=1.16.1",
   "mypy-extensions>=1.1.0",
@@ -28,8 +25,12 @@ dev = [
   "ruff>=0.12.3",
 ]
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E402", "E203", "F541", "C901", "E501"]
 
 [tool.mypy]
 warn_unused_configs = true

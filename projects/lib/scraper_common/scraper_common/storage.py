@@ -34,9 +34,7 @@ class DiskStorageClient:
     def __init__(self, folder: str):
         self.folder = folder
 
-    def upload_blob(
-        self, blob_name: str, buf: io.BytesIO, content_type: str = ""
-    ) -> str:
+    def upload_blob(self, blob_name: str, buf: io.BytesIO, content_type: str = "") -> str:
         blob_path = path.join(self.folder, blob_name)
         Path(blob_path).parent.mkdir(parents=True, exist_ok=True)
         with open(blob_path, "wb") as f:

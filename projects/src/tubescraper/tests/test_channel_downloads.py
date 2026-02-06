@@ -6,7 +6,6 @@ import pytest
 import requests
 import responses
 from scraper_common import ChannelFeed
-
 from tubescraper.coreapi import api_client
 
 CORE_API = api_client.api_url
@@ -89,9 +88,7 @@ def test_fetch_channel_feeds(mock_channel_feeds):
 
 @responses.activate
 def test_fetch_channel_feeds_empty():
-    _ = responses.add(
-        responses.GET, f"{CORE_API}/media_feeds/channels", json={}, status=200
-    )
+    _ = responses.add(responses.GET, f"{CORE_API}/media_feeds/channels", json={}, status=200)
 
     with pytest.raises(KeyError):
         _ = api_client.fetch_channel_feeds()

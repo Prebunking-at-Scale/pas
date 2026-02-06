@@ -44,7 +44,5 @@ def scrape_channel(
 
 if __name__ == "__main__":
     storage_client = DiskStorageClient("./reels/")
-    next_cursor = scrape_channel(
-        "alimasadia_", "3364843860104643554", storage_client, []
-    )
+    next_cursor = scrape_channel("alimasadia_", "3364843860104643554", storage_client, [])
     print(next_cursor)
