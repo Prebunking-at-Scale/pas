@@ -3,10 +3,9 @@ kind: CronJob
 metadata:
   name: instascraper
 spec:
-  concurrencyPolicy: Replace
+  schedule: "PLACEHOLDER"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/12 * * *
   jobTemplate:
     spec:
       template:
@@ -15,7 +14,7 @@ spec:
           serviceAccountName: workload-identity-sa
           containers:
             - name: instascraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper:dev
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper
               imagePullPolicy: Always
               resources:
                 limits:
@@ -25,8 +24,6 @@ spec:
                   cpu: 1
                   memory: 0.5G
               env:
-                - name: STORAGE_BUCKET_NAME
-                  value: "pas-prototyping-storage"
                 - name: APP_LOG_LEVEL
                   value: DEBUG
                 - name: ROOT_LOG_LEVEL

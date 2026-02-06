@@ -3,11 +3,9 @@ kind: CronJob
 metadata:
   name: tokscraper-channels
 spec:
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 3600
+  schedule: "PLACEHOLDER"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/1 * * *
   jobTemplate:
     spec:
       template:
@@ -16,7 +14,7 @@ spec:
           serviceAccountName: workload-identity-sa
           containers:
             - name: tokscraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:latest
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper
               imagePullPolicy: Always
               args: ["channels"]
               resources:
@@ -27,8 +25,6 @@ spec:
                   cpu: 1
                   memory: 0.5G
               env:
-                - name: STORAGE_BUCKET_NAME
-                  value: "pas-production-storage"
                 - name: APP_LOG_LEVEL
                   value: DEBUG
                 - name: ROOT_LOG_LEVEL
@@ -70,7 +66,7 @@ spec:
       serviceAccountName: workload-identity-sa
       containers:
         - name: tokscraper
-          image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper:latest
+          image: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper
           imagePullPolicy: Always
           args: ["rescrape"]
           resources:
@@ -81,8 +77,6 @@ spec:
               cpu: 1
               memory: 0.5G
           env:
-            - name: STORAGE_BUCKET_NAME
-              value: "pas-production-storage"
             - name: APP_LOG_LEVEL
               value: DEBUG
             - name: ROOT_LOG_LEVEL

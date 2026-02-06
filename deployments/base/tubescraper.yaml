@@ -3,11 +3,9 @@ kind: CronJob
 metadata:
   name: tubescraper-channels
 spec:
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 3600
+  schedule: "PLACEHOLDER"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/1 * * *
   jobTemplate:
     spec:
       template:
@@ -28,7 +26,7 @@ spec:
                   memory: 256M
           containers:
             - name: tubescraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper
               imagePullPolicy: Always
               args: ["channels"]
               resources:
@@ -39,8 +37,6 @@ spec:
                   cpu: 1
                   memory: 0.5G
               env:
-                - name: STORAGE_BUCKET_NAME
-                  value: "pas-production-storage"
                 - name: APP_LOG_LEVEL
                   value: DEBUG
                 - name: ROOT_LOG_LEVEL
@@ -72,11 +68,9 @@ kind: CronJob
 metadata:
   name: tubescraper-keywords
 spec:
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 3600
+  schedule: "PLACEHOLDER"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
-  schedule: 0 0/1 * * *
   jobTemplate:
     spec:
       template:
@@ -97,7 +91,7 @@ spec:
                   memory: 256M
           containers:
             - name: tubescraper
-              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
+              image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper
               imagePullPolicy: Always
               args: ["keywords"]
               resources:
@@ -108,8 +102,6 @@ spec:
                   cpu: 1
                   memory: 0.5G
               env:
-                - name: STORAGE_BUCKET_NAME
-                  value: "pas-production-storage"
                 - name: APP_LOG_LEVEL
                   value: DEBUG
                 - name: ROOT_LOG_LEVEL
@@ -165,7 +157,7 @@ spec:
               memory: 256M
       containers:
         - name: tubescraper
-          image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper:latest
+          image: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper
           imagePullPolicy: Always
           args: ["rescrape"]
           resources:
@@ -176,8 +168,6 @@ spec:
               cpu: 1
               memory: 0.5G
           env:
-            - name: STORAGE_BUCKET_NAME
-              value: "pas-production-storage"
             - name: APP_LOG_LEVEL
               value: DEBUG
             - name: ROOT_LOG_LEVEL

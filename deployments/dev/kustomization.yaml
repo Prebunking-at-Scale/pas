@@ -1,0 +1,103 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+
+images:
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper
+    newTag: dev
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper
+    newTag: dev
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper
+    newTag: dev
+
+patches:
+  # tokscraper-channels: dev schedule and concurrency
+  - target:
+      kind: CronJob
+      name: tokscraper-channels
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/12 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Replace
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"
+
+  # tokscraper-rescrape: storage bucket
+  - target:
+      kind: Deployment
+      name: tokscraper-rescrape
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"
+
+  # tubescraper-channels: dev schedule and concurrency
+  - target:
+      kind: CronJob
+      name: tubescraper-channels
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"
+
+  # tubescraper-keywords: dev schedule and concurrency
+  - target:
+      kind: CronJob
+      name: tubescraper-keywords
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"
+
+  # tubescraper-rescrape: storage bucket
+  - target:
+      kind: Deployment
+      name: tubescraper-rescrape
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"
+
+  # instascraper: dev schedule and concurrency
+  - target:
+      kind: CronJob
+      name: instascraper
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/12 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Replace
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-prototyping-storage"

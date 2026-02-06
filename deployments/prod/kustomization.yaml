@@ -1,0 +1,121 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+
+images:
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/tokscraper
+    newTag: latest
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/tubescraper
+    newTag: latest
+  - name: europe-west4-docker.pkg.dev/pas-shared/pas/instascraper
+    newTag: latest
+
+patches:
+  # tokscraper-channels: prod schedule, concurrency, deadline, storage
+  - target:
+      kind: CronJob
+      name: tokscraper-channels
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/startingDeadlineSeconds
+        value: 3600
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
+
+  # tokscraper-rescrape: storage bucket
+  - target:
+      kind: Deployment
+      name: tokscraper-rescrape
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
+
+  # tubescraper-channels: prod schedule, concurrency, deadline, storage
+  - target:
+      kind: CronJob
+      name: tubescraper-channels
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/startingDeadlineSeconds
+        value: 3600
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
+
+  # tubescraper-keywords: prod schedule, concurrency, deadline, storage
+  - target:
+      kind: CronJob
+      name: tubescraper-keywords
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/startingDeadlineSeconds
+        value: 3600
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
+
+  # tubescraper-rescrape: storage bucket
+  - target:
+      kind: Deployment
+      name: tubescraper-rescrape
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
+
+  # instascraper: prod schedule, concurrency, deadline, storage, higher memory
+  - target:
+      kind: CronJob
+      name: instascraper
+    patch: |
+      - op: replace
+        path: /spec/schedule
+        value: "0 0/1 * * *"
+      - op: add
+        path: /spec/concurrencyPolicy
+        value: Forbid
+      - op: add
+        path: /spec/startingDeadlineSeconds
+        value: 3600
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/resources/limits/memory
+        value: 4G
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/resources/requests/memory
+        value: 2G
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: STORAGE_BUCKET_NAME
+          value: "pas-production-storage"
