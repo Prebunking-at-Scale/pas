@@ -12,8 +12,8 @@ on:
           - tokscraper
           - instascraper
       tag:
-        description: "Git tag (e.g. tubescraper/v0.0.5)"
-        required: true
+        description: "Git tag (e.g. tubescraper/v0.0.5). Leave empty to deploy the latest production release."
+        required: false
         type: string
 
 env:
@@ -26,10 +26,24 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Parse tag and determine environment
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag and determine environment
         id: config
         run: |
           TAG="${{ inputs.tag }}"
+
+          if [ -z "$TAG" ]; then
+            TAG=$(git tag -l "${{ inputs.scraper }}/v*" | grep -v -- '-' | sort -V | tail -1)
+            if [ -z "$TAG" ]; then
+              echo "::error::No production release found for ${{ inputs.scraper }}"
+              exit 1
+            fi
+            echo "No tag specified, using latest production release: $TAG"
+          fi
+
           VERSION="${TAG#${{ inputs.scraper }}/}"
 
           if [ "$VERSION" = "$TAG" ]; then
@@ -49,7 +63,14 @@ jobs:
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - name: Print deploy details
+        run: |
+          echo "Scraper:     ${{ inputs.scraper }}"
+          echo "Version:     ${{ steps.config.outputs.version }}"
+          echo "Image:       ${{ env.REGISTRY }}/${{ inputs.scraper }}:${{ steps.config.outputs.version }}"
+          echo "Environment: ${{ steps.config.outputs.environment }}"
+          echo "Cluster:     ${{ steps.config.outputs.cluster }}"
+          echo "Project:     ${{ steps.config.outputs.gcp_project }}"
 
       - name: Update kustomize image tag
         run: |
