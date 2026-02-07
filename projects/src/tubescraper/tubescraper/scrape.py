@@ -1,4 +1,6 @@
 import io
+import random
+import time
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -44,6 +46,11 @@ def scrape_shorts(
 
     log.debug(f"{len(entries)} shorts found for {target}")
     for i, entry in enumerate(entries):
+        if i > 0:
+            sleep_for = random.uniform(5, 15)
+            log.debug(f"sleeping {sleep_for:.1f}s between downloads")
+            time.sleep(sleep_for)
+
         log.bind(entry=entry)
         log.info(f"processing {i + 1} of {len(entries)} for {target}...")
 

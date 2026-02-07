@@ -7,7 +7,7 @@ import structlog
 import yt_dlp
 from scraper_common import proxy_config
 from structlog.contextvars import bind_contextvars
-from tenacity import retry, stop_after_attempt
+from tenacity import retry, stop_after_attempt, wait_exponential
 from yt_dlp.networking.impersonate import ImpersonateTarget
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
@@ -40,7 +40,7 @@ def id_for_channel(s: str) -> str:
         raise ValueError("Channel without channel ID? Something's wrong")
 
 
-@retry(reraise=True, stop=stop_after_attempt(3))
+@retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=30, max=120))
 def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
     """fetch channel video entries"""
 
@@ -83,7 +83,7 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
     return filtered
 
 
-@retry(reraise=True, stop=stop_after_attempt(3))
+@retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=30, max=120))
 def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
     bind_contextvars(proxy_id=proxy_id)
@@ -124,7 +124,7 @@ def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
     return filtered
 
 
-@retry(reraise=True, stop=stop_after_attempt(3))
+@retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=30, max=120))
 def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any]:
     """Get details about a video. If buf is specified, download the video file
     into the buffer."""

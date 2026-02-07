@@ -64,7 +64,12 @@ def channels_downloader(
 ) -> None:
     log = logger.bind()
     channels = preprocess_channel_feeds(channel_feeds)
-    for channel, orgs in channels.items():
+    for i, (channel, orgs) in enumerate(channels.items()):
+        if i > 0:
+            sleep_for = random.uniform(10, 20)
+            log.info(f"sleeping {sleep_for:.1f}s between channels")
+            time.sleep(sleep_for)
+
         _ = bind_contextvars(channel_name=channel)
         log.info(f"archiving a new channel: {channel}")
 
@@ -95,7 +100,12 @@ def keywords_downloader(
     keywords = list(processed_keywords.keys())
     random.shuffle(keywords)
 
-    for keyword in keywords:
+    for i, keyword in enumerate(keywords):
+        if i > 0:
+            sleep_for = random.uniform(10, 20)
+            log.info(f"sleeping {sleep_for:.1f}s between keywords")
+            time.sleep(sleep_for)
+
         org_ids = processed_keywords[keyword]
 
         bind_contextvars(keyword=keyword)
@@ -131,7 +141,9 @@ def rescrape_shorts() -> None:
                     exc_info=ex,
                 )
                 continue
-            time.sleep(3)
+            time.sleep(random.uniform(5, 15))
+        log.info("re-scrape pass complete, cooling down")
+        time.sleep(60)
 
 
 @click.group()
