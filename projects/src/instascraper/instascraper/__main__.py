@@ -32,6 +32,8 @@ def channels_downloader(
             next_cursor = scrape_channel(channel, cursor, storage_client, orgs)
             if next_cursor:
                 coreapi.update_cursor(channel, next_cursor)
+            else:
+                log.info("no new reels found")
         except Exception as ex:
             log.error(
                 "unexpected error processing channel", media_feed=channel, exc_info=ex
