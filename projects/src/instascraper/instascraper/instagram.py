@@ -120,7 +120,7 @@ class Profile(BaseModel):
                     id=node.get("id"),
                     profile=self,
                     shortcode=node.get("shortcode"),
-                    view_count=node.get("video_view_count"),
+                    view_count=node.get("video_view_count") or node.get("play_count", 0),
                     likes_count=node.get("edge_liked_by", {}).get("count"),
                     comment_count=node.get("edge_media_to_comment", {}).get("count"),
                     timestamp=taken_at.isoformat(),
