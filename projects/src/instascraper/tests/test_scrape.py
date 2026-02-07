@@ -32,15 +32,15 @@ def _make_reel(id: str, profile: Profile | None = None) -> Reel:
     )
 
 
-@patch("instascraper.instagram._new_session")
+@patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_downloads_new_video(mock_instagram, mock_coreapi, mock_new_session):
+def test_downloads_new_video(mock_instagram, mock_coreapi, mocknew_session):
     session = MagicMock()
     response = MagicMock()
     response.content = b"video"
     session.get.return_value = response
-    mock_new_session.return_value = session
+    mocknew_session.return_value = session
 
     profile = _make_profile()
     reel = _make_reel("reel1", profile)
@@ -59,9 +59,12 @@ def test_downloads_new_video(mock_instagram, mock_coreapi, mock_new_session):
     mock_coreapi.update_video_stats.assert_not_called()
 
 
+@patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_updates_stats_for_existing_video(mock_instagram, mock_coreapi):
+def test_updates_stats_for_existing_video(mock_instagram, mock_coreapi, mocknew_session):
+    mocknew_session.return_value = MagicMock()
+
     profile = _make_profile()
     reel = _make_reel("reel1", profile)
     mock_instagram.fetch_profile.return_value = profile
@@ -77,15 +80,15 @@ def test_updates_stats_for_existing_video(mock_instagram, mock_coreapi):
     mock_coreapi.register_download.assert_not_called()
 
 
-@patch("instascraper.instagram._new_session")
+@patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_downloads_new_and_updates_existing(mock_instagram, mock_coreapi, mock_new_session):
+def test_downloads_new_and_updates_existing(mock_instagram, mock_coreapi, mocknew_session):
     session = MagicMock()
     response = MagicMock()
     response.content = b"video"
     session.get.return_value = response
-    mock_new_session.return_value = session
+    mocknew_session.return_value = session
 
     profile = _make_profile()
     new_reel = _make_reel("new_reel", profile)
@@ -105,9 +108,12 @@ def test_downloads_new_and_updates_existing(mock_instagram, mock_coreapi, mock_n
     mock_coreapi.update_video_stats.assert_called_once_with(old_reel, "db-id")
 
 
+@patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_no_reels_returns_none(mock_instagram, mock_coreapi):
+def test_no_reels_returns_none(mock_instagram, mock_coreapi, mocknew_session):
+    mocknew_session.return_value = MagicMock()
+
     profile = _make_profile()
     mock_instagram.fetch_profile.return_value = profile
     type(profile).reels = property(lambda self: [])

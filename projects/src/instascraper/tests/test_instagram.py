@@ -1,5 +1,5 @@
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from instascraper import instagram
@@ -112,11 +112,10 @@ def _mock_session_with_response(json_data=None, content=None, status_code=200):
     return session
 
 
-@patch("instascraper.instagram._new_session")
-def test_fetch_profile_success(mock_new_session, mock_instagram_user):
-    mock_new_session.return_value = _mock_session_with_response(json_data=mock_instagram_user)
+def test_fetch_profile_success(mock_instagram_user):
+    session = _mock_session_with_response(json_data=mock_instagram_user)
 
-    profile = fetch_profile("test_user")
+    profile = fetch_profile("test_user", session)
 
     assert isinstance(profile, Profile)
     assert profile.id == "123456789"
@@ -190,10 +189,9 @@ def test_profile_reels_empty_description():
     assert reels[0].description == ""
 
 
-@patch("instascraper.instagram._new_session")
-def test_reel_video_bytes(mock_new_session):
+def test_reel_video_bytes():
     mock_video_content = b"fake video content"
-    mock_new_session.return_value = _mock_session_with_response(content=mock_video_content)
+    session = _mock_session_with_response(content=mock_video_content)
 
     profile = Profile(
         id="123456789",
@@ -217,7 +215,7 @@ def test_reel_video_bytes(mock_new_session):
         raw={},
     )
 
-    result = reel.video_bytes()
+    result = reel.video_bytes(session)
 
     assert isinstance(result, io.BytesIO)
     assert result.getvalue() == mock_video_content

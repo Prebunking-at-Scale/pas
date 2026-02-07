@@ -5,6 +5,7 @@ import structlog
 from scraper_common import DiskStorageClient, StorageClient
 
 from instascraper import coreapi, instagram
+from instascraper.instagram import new_session
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -15,7 +16,8 @@ def scrape_channel(
     log = logger.new(cursor=cursor, channel=channel)
 
     next_cursor = None
-    profile = instagram.fetch_profile(channel)
+    session = new_session()
+    profile = instagram.fetch_profile(channel, session)
     reels = profile.reels
     log.debug(f"got {len(reels)} reels for {channel}")
     for reel in reels:
@@ -26,7 +28,7 @@ def scrape_channel(
                 coreapi.update_video_stats(reel, existing_video["id"])
                 continue
 
-            bytes = reel.video_bytes()
+            bytes = reel.video_bytes(session)
             blob_name = path.join(channel, f"{reel.id}.mp4")
             blob_path = storage_client.upload_blob(blob_name, bytes)
             coreapi.register_download(reel, org_ids, blob_path)

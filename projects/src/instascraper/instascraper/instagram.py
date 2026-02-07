@@ -10,7 +10,6 @@ from curl_cffi.requests import Session
 from pydantic import BaseModel
 from scraper_common import proxy_config
 from structlog.contextvars import bind_contextvars
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
@@ -47,7 +46,7 @@ def _random_sleep() -> None:
     time.sleep(sleep_for)
 
 
-def _new_session() -> Session:
+def new_session() -> Session:
     session = Session(impersonate="chrome")
     session.headers.update(_get_public_headers())
     proxy = _random_proxy()
@@ -74,11 +73,9 @@ class Reel(BaseModel):
     video_url: str
     raw: dict[str, Any]
 
-    @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=10, max=60))
-    def video_bytes(self) -> io.BytesIO:
+    def video_bytes(self, session: Session) -> io.BytesIO:
         logger.info("fetching video", user=self.profile.username, video_id=self.id)
         _random_sleep()
-        session = _new_session()
         resp = session.get(self.video_url, timeout=600)
         resp.raise_for_status()
         return io.BytesIO(resp.content)
@@ -120,7 +117,8 @@ class Profile(BaseModel):
                     id=node.get("id"),
                     profile=self,
                     shortcode=node.get("shortcode"),
-                    view_count=node.get("video_view_count") or node.get("play_count", 0),
+                    view_count=node.get("video_view_count")
+                    or node.get("play_count", 0),
                     likes_count=node.get("edge_liked_by", {}).get("count"),
                     comment_count=node.get("edge_media_to_comment", {}).get("count"),
                     timestamp=taken_at.isoformat(),
@@ -133,11 +131,8 @@ class Profile(BaseModel):
         return reels
 
 
-@retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=10, max=60))
-def fetch_profile(username: str) -> Profile:
+def fetch_profile(username: str, session: Session) -> Profile:
     logger.info("fetching profile", username=username)
-    _random_sleep()
-    session = _new_session()
     resp = session.get(
         f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
         timeout=10,
