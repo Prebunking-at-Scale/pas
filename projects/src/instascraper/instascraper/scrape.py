@@ -2,12 +2,20 @@ from os import path
 from uuid import UUID
 
 import structlog
-from scraper_common import DiskStorageClient, StorageClient
+from scraper_common import DiskStorageClient, StorageClient, proxy_config
 
 from instascraper import coreapi, instagram
-from instascraper.instagram import new_session
+from instascraper.instagram import RateLimitError, new_session
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
+
+RATE_LIMIT_DURATION = 300
+
+
+def _deactivate_and_new_session(session, log):
+    log.warning("rate limited, deactivating proxy and switching")
+    proxy_config.deactivate_proxy(session.proxy_id, RATE_LIMIT_DURATION)
+    return new_session()
 
 
 def scrape_channel(
@@ -17,7 +25,13 @@ def scrape_channel(
 
     next_cursor = None
     session = new_session()
-    profile = instagram.fetch_profile(channel, session)
+
+    try:
+        profile = instagram.fetch_profile(channel, session)
+    except RateLimitError:
+        session = _deactivate_and_new_session(session, log)
+        profile = instagram.fetch_profile(channel, session)
+
     reels = profile.reels
     log.debug(f"got {len(reels)} reels for {channel}")
     for reel in reels:
@@ -28,7 +42,12 @@ def scrape_channel(
                 coreapi.update_video_stats(reel, existing_video["id"])
                 continue
 
-            bytes = reel.video_bytes(session)
+            try:
+                bytes = reel.video_bytes(session)
+            except RateLimitError:
+                session = _deactivate_and_new_session(session, log)
+                bytes = reel.video_bytes(session)
+
             blob_name = path.join(channel, f"{reel.id}.mp4")
             blob_path = storage_client.upload_blob(blob_name, bytes)
             coreapi.register_download(reel, org_ids, blob_path)
@@ -48,7 +67,5 @@ def scrape_channel(
 
 if __name__ == "__main__":
     storage_client = DiskStorageClient("./reels/")
-    next_cursor = scrape_channel(
-        "alimasadia_", "3364843860104643554", storage_client, []
-    )
+    next_cursor = scrape_channel("SeloCicin", "3364843860104643554", storage_client, [])
     print(next_cursor)

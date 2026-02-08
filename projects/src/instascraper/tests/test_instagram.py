@@ -5,6 +5,7 @@ import pytest
 from instascraper import instagram
 from instascraper.instagram import (
     Profile,
+    RateLimitError,
     Reel,
     fetch_profile,
 )
@@ -219,3 +220,36 @@ def test_reel_video_bytes():
 
     assert isinstance(result, io.BytesIO)
     assert result.getvalue() == mock_video_content
+
+
+@pytest.mark.parametrize("status_code", [401, 429])
+def test_fetch_profile_raises_rate_limit_error(mock_instagram_user, status_code):
+    session = _mock_session_with_response(
+        json_data=mock_instagram_user, status_code=status_code
+    )
+    with pytest.raises(RateLimitError):
+        fetch_profile("test_user", session)
+
+
+@pytest.mark.parametrize("status_code", [401, 429])
+def test_video_bytes_raises_rate_limit_error(status_code):
+    session = _mock_session_with_response(content=b"", status_code=status_code)
+
+    profile = Profile(
+        id="123", username="test", display_name="Test", followers=0, following=0, raw={}
+    )
+    reel = Reel(
+        id="1",
+        profile=profile,
+        shortcode="sc",
+        view_count=0,
+        likes_count=0,
+        comment_count=0,
+        timestamp="2024-01-01T00:00:00",
+        description="",
+        video_url="https://example.com/video.mp4",
+        raw={},
+    )
+
+    with pytest.raises(RateLimitError):
+        reel.video_bytes(session)

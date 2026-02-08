@@ -21,6 +21,10 @@ class InstagramError(Exception):
     pass
 
 
+class RateLimitError(InstagramError):
+    pass
+
+
 def _get_public_headers() -> dict:
     return {
         "Accept": "*/*",
@@ -31,13 +35,13 @@ def _get_public_headers() -> dict:
     }
 
 
-def _random_proxy() -> str | None:
+def _random_proxy() -> tuple[str, int] | tuple[None, None]:
     if not proxy_config.is_configured:
         logger.warning("proxy not configured - not using proxy")
-        return None
+        return None, None
     proxy_url, proxy_id = proxy_config.get_proxy_details()
     bind_contextvars(proxy_id=proxy_id)
-    return proxy_url
+    return proxy_url, proxy_id
 
 
 def _random_sleep() -> None:
@@ -49,15 +53,18 @@ def _random_sleep() -> None:
 def new_session() -> Session:
     session = Session(impersonate="chrome")
     session.headers.update(_get_public_headers())
-    proxy = _random_proxy()
-    if proxy:
-        session.proxies = {"http": proxy, "https": proxy}
+    proxy_url, proxy_id = _random_proxy()
+    if proxy_url:
+        session.proxies = {"http": proxy_url, "https": proxy_url}
+    session.proxy_id = proxy_id  # type: ignore[attr-defined]
     logger.info("warming up session with instagram.com")
     resp = session.get("https://www.instagram.com/", timeout=10)
     resp.raise_for_status()
     csrf = session.cookies.get("csrftoken")
     if csrf:
         session.headers["X-CSRFToken"] = csrf
+    else:
+        logger.info("could not get CSRFToken")
     return session
 
 
@@ -77,6 +84,8 @@ class Reel(BaseModel):
         logger.info("fetching video", user=self.profile.username, video_id=self.id)
         _random_sleep()
         resp = session.get(self.video_url, timeout=600)
+        if resp.status_code in (401, 429):
+            raise RateLimitError(f"Rate limited (HTTP {resp.status_code})")
         resp.raise_for_status()
         return io.BytesIO(resp.content)
 
@@ -137,6 +146,8 @@ def fetch_profile(username: str, session: Session) -> Profile:
         f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
         timeout=10,
     )
+    if resp.status_code in (401, 429):
+        raise RateLimitError(f"Rate limited (HTTP {resp.status_code})")
     resp.raise_for_status()
 
     json_resp = resp.json()
