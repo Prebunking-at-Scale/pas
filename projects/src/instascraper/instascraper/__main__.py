@@ -38,7 +38,7 @@ def channels_downloader(
             log.error(
                 "unexpected error processing channel", media_feed=channel, exc_info=ex
             )
-        time.sleep(10)
+        time.sleep(30)
 
 
 def channel_feeds() -> ChannelWatchers:

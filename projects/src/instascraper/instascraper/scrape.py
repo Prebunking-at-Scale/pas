@@ -9,7 +9,7 @@ from instascraper.instagram import RateLimitError, new_session
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
-RATE_LIMIT_DURATION = 300
+RATE_LIMIT_DURATION = 600
 
 
 def _deactivate_and_new_session(session, log):
