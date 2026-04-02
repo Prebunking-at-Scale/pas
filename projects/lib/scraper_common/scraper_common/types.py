@@ -22,7 +22,8 @@ class ChannelFeed(MediaFeed):
 
 
 class KeywordFeed(MediaFeed):
-    topic: str
+    topic_id: UUID
+    topic_name: str
     keywords: list[str]
 
 
