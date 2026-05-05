@@ -1186,7 +1186,7 @@ requires-dist = [
     { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
-    { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2025.12.8" },
+    { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2026.3.17" },
 ]
 
 [package.metadata.requires-dev]
@@ -1227,7 +1227,7 @@ requires-dist = [
     { name = "scraper-common", editable = "projects/lib/scraper_common" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "tenacity", specifier = ">=9.1.2" },
-    { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2025.12.8" },
+    { name = "yt-dlp", extras = ["default", "curl-cffi"], specifier = ">=2026.3.17" },
 ]
 
 [package.metadata.requires-dev]
