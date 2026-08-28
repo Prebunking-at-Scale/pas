@@ -141,6 +141,9 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
             "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
             "logtostderr": True,
             "format": "18/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+            # Prefer the format closest to 480p over the highest resolution,
+            # to keep file sizes near what format 18 (360p) used to give us.
+            "format_sort": ["res:480"],
             "merge_output_format": "mp4",
             "proxy": proxy_addr,
             "impersonate": ImpersonateTarget(client="chrome"),
