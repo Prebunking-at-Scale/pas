@@ -1,6 +1,6 @@
-import contextlib
 import io
 import os
+import tempfile
 from typing import Any, cast
 
 import structlog
@@ -131,35 +131,38 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
     bind_contextvars(proxy_id=proxy_id)
 
-    download = True
-    if not buf:
-        download = False
-        buf = io.BytesIO()
+    download = buf is not None
 
-    # 18 (360p mp4) is the only format that doesn't require ffmpeg post-processing.
-    # if we use any other format yt-dlp has to merge video and audio streams
-    # separately, which results in the output not correctly being written to stdout
-    # (something to do with subprocesses? not sure) so this is something to consider
-    # when making a change here
-    ctx = {
-        "outtmpl": "-",
-        "logtostderr": True,
-        "format": "18",
-        "proxy": proxy_addr,
-        "impersonate": ImpersonateTarget(client="chrome"),
-        "extractor_args": {
-            "youtube": {
-                "player_skip": ["configs", "initial_data"],
-                "skip": ["dash", "hls", "translated_subs", "subs"],
-                "player_js_version": ["actual"],
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # YouTube no longer serves format 18 (progressive mp4) to most clients,
+        # so video and audio are fetched separately and ffmpeg-merged, which
+        # needs a real output file rather than stdout.
+        ctx = {
+            "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
+            "logtostderr": True,
+            "format": "18/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+            "merge_output_format": "mp4",
+            "proxy": proxy_addr,
+            "impersonate": ImpersonateTarget(client="chrome"),
+            "extractor_args": {
+                "youtube": {
+                    "player_skip": ["configs", "initial_data"],
+                    "skip": ["dash", "hls", "translated_subs", "subs"],
+                    "player_js_version": ["actual"],
+                },
+                "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
             },
-            "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
-        },
-    }
-    buf.seek(0)
-    with contextlib.redirect_stdout(buf), yt_dlp.YoutubeDL(ctx) as video:  # type: ignore
-        details = video.extract_info(entry_id, download=download)
-        details = cast(dict[Any, Any], details)
-    logger.debug(f"downloaded bytes: {buf.tell()}")
-    buf.seek(0)
+        }
+        with yt_dlp.YoutubeDL(ctx) as video:
+            details = video.extract_info(entry_id, download=download)
+            details = cast(dict[Any, Any], details)
+
+        if buf is not None:
+            filepath = details["requested_downloads"][0]["filepath"]
+            buf.seek(0)
+            with open(filepath, "rb") as f:
+                buf.write(f.read())
+            logger.debug(f"downloaded bytes: {buf.tell()}")
+            buf.seek(0)
+
     return details
