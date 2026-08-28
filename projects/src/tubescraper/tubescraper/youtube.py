@@ -14,6 +14,28 @@ logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "")
 
+PROXY_BLOCK_DURATION = 600
+
+# Substrings of yt-dlp errors that mean YouTube has flagged the requesting IP,
+# rather than there being a problem with the video itself.
+BLOCK_SIGNATURES = (
+    "Sign in to confirm",
+    "HTTP Error 403",
+    "HTTP Error 429",
+)
+
+
+def bench_proxy_if_blocked(ex: Exception, proxy_id: int) -> None:
+    """Deactivate the proxy for a while if the error looks like an IP block."""
+    message = str(ex)
+    if any(signature in message for signature in BLOCK_SIGNATURES):
+        logger.warning(
+            "proxy appears blocked by youtube, deactivating",
+            event_metric="proxy_blocked",
+            proxy_id=proxy_id,
+        )
+        proxy_config.deactivate_proxy(proxy_id, PROXY_BLOCK_DURATION)
+
 
 def id_for_channel(s: str) -> str:
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
@@ -27,17 +49,23 @@ def id_for_channel(s: str) -> str:
         "playlist_items": "0",
         "retries": 3,
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        if not s.startswith("@"):
-            s = f"channel/{s}"
-        info = ydl.extract_info(f"https://youtube.com/{s}")
-        if not info:
-            logger.warning("No info dict returned from yt-dlp", channel_identifier=s)
-            raise ValueError("No info dict from yt_dlp")
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            if not s.startswith("@"):
+                s = f"channel/{s}"
+            info = ydl.extract_info(f"https://youtube.com/{s}")
+            if not info:
+                logger.warning(
+                    "No info dict returned from yt-dlp", channel_identifier=s
+                )
+                raise ValueError("No info dict from yt_dlp")
 
-        if res := info.get("channel_id"):
-            return res  # type: ignore
-        raise ValueError("Channel without channel ID? Something's wrong")
+            if res := info.get("channel_id"):
+                return res  # type: ignore
+            raise ValueError("Channel without channel ID? Something's wrong")
+    except yt_dlp.utils.DownloadError as ex:
+        bench_proxy_if_blocked(ex, proxy_id)
+        raise
 
 
 @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=30, max=120))
@@ -63,19 +91,23 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        logger.info(f"fetching entries for {channel_id}")
-        info = ydl.extract_info(
-            f"https://youtube.com/channel/{channel_id}/shorts",
-            download=False,
-        )
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            logger.info(f"fetching entries for {channel_id}")
+            info = ydl.extract_info(
+                f"https://youtube.com/channel/{channel_id}/shorts",
+                download=False,
+            )
 
-        if not info:
-            raise ValueError("Empty info dict")
+            if not info:
+                raise ValueError("Empty info dict")
 
-        entries = info.get("entries")
-        if not isinstance(entries, list):
-            raise ValueError("No or malformed entries")
+            entries = info.get("entries")
+            if not isinstance(entries, list):
+                raise ValueError("No or malformed entries")
+    except yt_dlp.utils.DownloadError as ex:
+        bench_proxy_if_blocked(ex, proxy_id)
+        raise
 
     filtered = list(filter(None, entries))
     filtered = [x for x in filtered if "/shorts/" in x.get("url", "")]
@@ -104,21 +136,25 @@ def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        logger.info(f"downloading entries for {keyword}")
-        info = ydl.extract_info(
-            # the sp parameter is a pre-computed search query that only matches shorts
-            # uploaded in the last week
-            f'https://www.youtube.com/results?search_query="{keyword}"&sp=CAISBggDEAkYAQ%253D%253D',
-            download=False,
-        )
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            logger.info(f"downloading entries for {keyword}")
+            info = ydl.extract_info(
+                # the sp parameter is a pre-computed search query that only matches
+                # shorts uploaded in the last week
+                f'https://www.youtube.com/results?search_query="{keyword}"&sp=CAISBggDEAkYAQ%253D%253D',
+                download=False,
+            )
 
-        if not info:
-            raise ValueError("Empty info dict")
+            if not info:
+                raise ValueError("Empty info dict")
 
-        entries = info.get("entries")
-        if not isinstance(entries, list):
-            raise ValueError("No or malformed entries")
+            entries = info.get("entries")
+            if not isinstance(entries, list):
+                raise ValueError("No or malformed entries")
+    except yt_dlp.utils.DownloadError as ex:
+        bench_proxy_if_blocked(ex, proxy_id)
+        raise
 
     filtered = list(filter(None, entries))
     return filtered
@@ -156,9 +192,13 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
                 "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
             },
         }
-        with yt_dlp.YoutubeDL(ctx) as video:
-            details = video.extract_info(entry_id, download=download)
-            details = cast(dict[Any, Any], details)
+        try:
+            with yt_dlp.YoutubeDL(ctx) as video:
+                details = video.extract_info(entry_id, download=download)
+                details = cast(dict[Any, Any], details)
+        except yt_dlp.utils.DownloadError as ex:
+            bench_proxy_if_blocked(ex, proxy_id)
+            raise
 
         if buf is not None:
             filepath = details["requested_downloads"][0]["filepath"]
