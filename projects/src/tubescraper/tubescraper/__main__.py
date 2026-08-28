@@ -18,7 +18,7 @@ from structlog.contextvars import bind_contextvars
 
 from tubescraper.coreapi import PLATFORM, api_client, fetch_cursor, update_cursor
 from tubescraper.scrape import rescrape_short, scrape_shorts
-from tubescraper.youtube import channel_shorts, id_for_channel, keyword_shorts
+from tubescraper.youtube import channel_shorts, keyword_shorts
 
 type TargetOrgMapping = dict[str, list[UUID]]
 
@@ -74,10 +74,9 @@ def channels_downloader(
         log.info(f"archiving a new channel: {channel}")
 
         try:
-            channel_id = id_for_channel(channel)
-            cursor = fetch_cursor(channel_id)
-            entries = channel_shorts(channel_id, SHORTS_PER_TARGET)
-            next_cursor = scrape_shorts(entries, cursor, storage_client, channel_id, orgs)
+            cursor = fetch_cursor(channel)
+            entries = channel_shorts(channel, SHORTS_PER_TARGET)
+            next_cursor = scrape_shorts(entries, cursor, storage_client, channel, orgs)
             if next_cursor:
                 update_cursor(channel, next_cursor)
         except ValueError as ex:

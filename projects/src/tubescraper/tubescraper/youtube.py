@@ -37,39 +37,14 @@ def bench_proxy_if_blocked(ex: Exception, proxy_id: int) -> None:
         proxy_config.deactivate_proxy(proxy_id, PROXY_BLOCK_DURATION)
 
 
-def id_for_channel(s: str) -> str:
-    proxy_addr, proxy_id = proxy_config.get_proxy_details()
-    bind_contextvars(proxy_id=proxy_id)
-    opts = {
-        "extract_flat": False,
-        "proxy": proxy_addr,
-        "ignoreerrors": "only_download",
-        "noprogress": True,
-        "impersonate": ImpersonateTarget(client="chrome"),
-        "playlist_items": "0",
-        "retries": 3,
-    }
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            if not s.startswith("@"):
-                s = f"channel/{s}"
-            info = ydl.extract_info(f"https://youtube.com/{s}")
-            if not info:
-                logger.warning(
-                    "No info dict returned from yt-dlp", channel_identifier=s
-                )
-                raise ValueError("No info dict from yt_dlp")
-
-            if res := info.get("channel_id"):
-                return res  # type: ignore
-            raise ValueError("Channel without channel ID? Something's wrong")
-    except yt_dlp.utils.DownloadError as ex:
-        bench_proxy_if_blocked(ex, proxy_id)
-        raise
+def channel_url(channel: str) -> str:
+    """Build the shorts listing URL for a channel handle or channel ID."""
+    path = channel if channel.startswith("@") else f"channel/{channel}"
+    return f"https://youtube.com/{path}/shorts"
 
 
 @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(min=30, max=120))
-def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
+def channel_shorts(channel: str, num: int = 200) -> list[dict[Any, Any]]:
     """fetch channel video entries"""
 
     proxy_addr, proxy_id = proxy_config.get_proxy_details()
@@ -93,11 +68,8 @@ def channel_shorts(channel_id: str, num: int = 200) -> list[dict[Any, Any]]:
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
-            logger.info(f"fetching entries for {channel_id}")
-            info = ydl.extract_info(
-                f"https://youtube.com/channel/{channel_id}/shorts",
-                download=False,
-            )
+            logger.info(f"fetching entries for {channel}")
+            info = ydl.extract_info(channel_url(channel), download=False)
 
             if not info:
                 raise ValueError("Empty info dict")
