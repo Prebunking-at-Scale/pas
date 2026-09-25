@@ -45,6 +45,7 @@ def scrape_shorts(
     next_cursor = None
 
     log.debug(f"{len(entries)} shorts found for {target}")
+    max_age_reached = False
     for i, entry in enumerate(entries):
         if i > 0:
             sleep_for = random.uniform(5, 15)
@@ -59,7 +60,6 @@ def scrape_shorts(
         # videos until we reach the cursor (or something older than it). We
         # can however stop if we've seen a video before
         existing_video = api_client.get_video(entry["id"], PLATFORM)
-        max_age_reached = False
         buf = io.BytesIO() if not existing_video else None
         try:
             if existing_video:
