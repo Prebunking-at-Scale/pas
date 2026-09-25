@@ -92,8 +92,13 @@ def scrape_shorts(
 
             if buf:
                 destination_path = storage_client.upload_blob(blob_name(details), buf)
-                register_download(details, org_ids, destination_path)
-                log.info("download successful", event_metric="download_success")
+                if register_download(details, org_ids, destination_path):
+                    log.info("download successful", event_metric="download_success")
+                else:
+                    log.warning(
+                        "downloaded video was not registered",
+                        event_metric="register_failure",
+                    )
 
             if not next_cursor or timestamp > next_cursor:
                 next_cursor = timestamp
