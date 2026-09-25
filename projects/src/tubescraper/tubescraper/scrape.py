@@ -46,12 +46,8 @@ def scrape_shorts(
 
     log.debug(f"{len(entries)} shorts found for {target}")
     max_age_reached = False
+    downloaded_before = False
     for i, entry in enumerate(entries):
-        if i > 0:
-            sleep_for = random.uniform(5, 15)
-            log.debug(f"sleeping {sleep_for:.1f}s between downloads")
-            time.sleep(sleep_for)
-
         log.bind(entry=entry)
         log.info(f"processing {i + 1} of {len(entries)} for {target}...")
 
@@ -83,6 +79,14 @@ def scrape_shorts(
                 # Dont download anything new, but keep looking so we can update
                 # any stats for videos we already have
                 continue
+
+            # Only space out requests to YouTube. Entries we skip above only
+            # talk to our own API.
+            if downloaded_before:
+                sleep_for = random.uniform(5, 15)
+                log.debug(f"sleeping {sleep_for:.1f}s between downloads")
+                time.sleep(sleep_for)
+            downloaded_before = True
 
             details = video_details(entry["id"], buf)
             timestamp = datetime.fromtimestamp(details["timestamp"])
