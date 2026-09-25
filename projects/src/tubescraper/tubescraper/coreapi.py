@@ -32,7 +32,9 @@ def register_download(
         logger.error("found channel entry without video_id? continuing")
         return False
 
-    if not entry.get("video_ext"):
+    # Check requested_downloads rather than video_ext: yt-dlp doesn't set
+    # video_ext when it merges separate video and audio formats.
+    if not entry.get("requested_downloads"):
         logger.warning(f"we didn't download video {entry_id}, skipping")
         return False
 
