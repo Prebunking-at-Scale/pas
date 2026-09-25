@@ -14,7 +14,7 @@ spec:
           serviceAccountName: workload-identity-sa
           initContainers:
             - name: youtubepot-bgutil
-              image: brainicism/bgutil-ytdlp-pot-provider:1.3.2
+              image: brainicism/bgutil-ytdlp-pot-provider:2.0.0
               imagePullPolicy: Always
               restartPolicy: Always
               resources:
@@ -79,7 +79,7 @@ spec:
           serviceAccountName: workload-identity-sa
           initContainers:
             - name: youtubepot-bgutil
-              image: brainicism/bgutil-ytdlp-pot-provider:1.3.2
+              image: brainicism/bgutil-ytdlp-pot-provider:2.0.0
               imagePullPolicy: Always
               restartPolicy: Always
               resources:
@@ -145,7 +145,7 @@ spec:
       serviceAccountName: workload-identity-sa
       initContainers:
         - name: youtubepot-bgutil
-          image: brainicism/bgutil-ytdlp-pot-provider:1.3.2
+          image: brainicism/bgutil-ytdlp-pot-provider:2.0.0
           imagePullPolicy: Always
           restartPolicy: Always
           resources:
