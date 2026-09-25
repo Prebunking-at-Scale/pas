@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from instascraper.instagram import Profile, RateLimitError, Reel
 from instascraper.scrape import scrape_channel
+from structlog.testing import capture_logs
 
 
 def _make_profile():
@@ -62,7 +63,9 @@ def test_downloads_new_video(mock_instagram, mock_coreapi, mocknew_session):
 @patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_updates_stats_for_existing_video(mock_instagram, mock_coreapi, mocknew_session):
+def test_updates_stats_for_existing_video(
+    mock_instagram, mock_coreapi, mocknew_session
+):
     mocknew_session.return_value = MagicMock()
 
     profile = _make_profile()
@@ -83,7 +86,9 @@ def test_updates_stats_for_existing_video(mock_instagram, mock_coreapi, mocknew_
 @patch("instascraper.scrape.new_session")
 @patch("instascraper.scrape.coreapi")
 @patch("instascraper.scrape.instagram")
-def test_downloads_new_and_updates_existing(mock_instagram, mock_coreapi, mocknew_session):
+def test_downloads_new_and_updates_existing(
+    mock_instagram, mock_coreapi, mocknew_session
+):
     session = MagicMock()
     response = MagicMock()
     response.content = b"video"
@@ -172,7 +177,10 @@ def test_retries_video_download_on_rate_limit(
     type(profile).reels = property(lambda self: [reel])
 
     mock_coreapi.get_video.return_value = None
-    mock_video_bytes.side_effect = [RateLimitError("rate limited"), io.BytesIO(b"video")]
+    mock_video_bytes.side_effect = [
+        RateLimitError("rate limited"),
+        io.BytesIO(b"video"),
+    ]
 
     storage = MagicMock()
     storage.upload_blob.return_value = "blob/path"
@@ -183,3 +191,27 @@ def test_retries_video_download_on_rate_limit(
     mock_proxy_config.deactivate_proxy.assert_called_once_with(1, 300)
     assert mock_new_session.call_count == 2
     mock_coreapi.register_download.assert_called_once()
+
+
+@patch("instascraper.instagram._random_sleep")
+@patch("instascraper.scrape.new_session")
+@patch("instascraper.scrape.coreapi")
+@patch("instascraper.scrape.instagram")
+def test_logs_registration_result(
+    mock_instagram, mock_coreapi, mocknew_session, _sleep
+):
+    profile = _make_profile()
+    reels = [_make_reel("ok", profile), _make_reel("rejected", profile)]
+    mock_instagram.fetch_profile.return_value = profile
+    type(profile).reels = property(lambda self: reels)
+    mock_coreapi.get_video.return_value = None
+    mock_coreapi.register_download.side_effect = [True, False]
+    mocknew_session.return_value.get.return_value.content = b"video"
+
+    with capture_logs() as logs:
+        scrape_channel("test_user", None, MagicMock(), [])
+
+    metrics = [
+        (e.get("event_metric"), e.get("reel_id")) for e in logs if e.get("event_metric")
+    ]
+    assert metrics == [("download_success", "ok"), ("register_failure", "rejected")]

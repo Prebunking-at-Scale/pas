@@ -50,7 +50,18 @@ def scrape_channel(
 
             blob_name = path.join(channel, f"{reel.id}.mp4")
             blob_path = storage_client.upload_blob(blob_name, bytes)
-            coreapi.register_download(reel, org_ids, blob_path)
+            if coreapi.register_download(reel, org_ids, blob_path):
+                log.info(
+                    "download successful",
+                    event_metric="download_success",
+                    reel_id=reel.id,
+                )
+            else:
+                log.warning(
+                    "downloaded video was not registered",
+                    event_metric="register_failure",
+                    reel_id=reel.id,
+                )
 
             if not next_cursor:
                 next_cursor = reel.id
