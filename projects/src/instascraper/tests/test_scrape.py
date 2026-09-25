@@ -1,9 +1,9 @@
 import io
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from instascraper.instagram import Profile, RateLimitError, Reel
-from instascraper.scrape import scrape_channel
+from instascraper.scrape import RATE_LIMIT_DURATION, scrape_channel
 from structlog.testing import capture_logs
 
 
@@ -152,7 +152,7 @@ def test_retries_profile_fetch_on_rate_limit(
     result = scrape_channel("test_user", None, storage, [])
 
     assert result is None
-    mock_proxy_config.deactivate_proxy.assert_called_once_with(1, 300)
+    mock_proxy_config.deactivate_proxy.assert_called_once_with(1, RATE_LIMIT_DURATION)
     assert mock_new_session.call_count == 2
     assert mock_instagram.fetch_profile.call_count == 2
 
@@ -188,7 +188,7 @@ def test_retries_video_download_on_rate_limit(
     result = scrape_channel("test_user", None, storage, [])
 
     assert result == "reel1"
-    mock_proxy_config.deactivate_proxy.assert_called_once_with(1, 300)
+    mock_proxy_config.deactivate_proxy.assert_called_once_with(1, RATE_LIMIT_DURATION)
     assert mock_new_session.call_count == 2
     mock_coreapi.register_download.assert_called_once()
 
