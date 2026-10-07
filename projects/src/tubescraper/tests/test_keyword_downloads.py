@@ -30,7 +30,8 @@ def keyword_data():
             {
                 "id": str(uuid4()),
                 "organisation_id": org_id_1,
-                "topic": "sports",
+                "topic_id": str(uuid4()),
+                "topic_name": "sports",
                 "keywords": ["football", "basketball"],
                 "is_archived": False,
                 "created_at": datetime.now().isoformat(),
@@ -39,7 +40,8 @@ def keyword_data():
             {
                 "id": str(uuid4()),
                 "organisation_id": org_id_1,
-                "topic": "music",
+                "topic_id": str(uuid4()),
+                "topic_name": "music",
                 "keywords": ["rock", "jazz"],
                 "is_archived": True,
                 "created_at": datetime.now().isoformat(),
@@ -48,7 +50,8 @@ def keyword_data():
             {
                 "id": str(uuid4()),
                 "organisation_id": org_id_1,
-                "topic": "tech",
+                "topic_id": str(uuid4()),
+                "topic_name": "tech",
                 "keywords": ["ai", "cloud"],
                 "is_archived": False,
                 "created_at": datetime.now().isoformat(),
@@ -57,7 +60,8 @@ def keyword_data():
             {
                 "id": str(uuid4()),
                 "organisation_id": org_id_2,
-                "topic": "tech",
+                "topic_id": str(uuid4()),
+                "topic_name": "tech",
                 "keywords": ["ai", "python"],
                 "is_archived": False,
                 "created_at": datetime.now().isoformat(),
@@ -80,7 +84,7 @@ def test_keyword_fetch(keyword_data: dict[str, Any]):
     assert isinstance(feeds, list)
     assert all(isinstance(f, KeywordFeed) for f in feeds)
     assert "football" in feeds[0].keywords
-    assert feeds[0].topic == "sports"
+    assert feeds[0].topic_name == "sports"
     assert feeds[1].is_archived
 
 
@@ -115,7 +119,8 @@ def test_keyword_feed_validation(keyword_data: dict[str, Any]):
     feeds = api_client.fetch_keyword_feeds()
     sample = feeds[1]
     expected = keyword_data["data"][1]
-    assert sample.topic == expected["topic"]
+    assert sample.topic_id == UUID(expected["topic_id"])
+    assert sample.topic_name == expected["topic_name"]
     assert sample.keywords == expected["keywords"]
     assert sample.is_archived is True
 
