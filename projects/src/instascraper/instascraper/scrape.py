@@ -9,12 +9,15 @@ from instascraper.instagram import RateLimitError, new_session
 
 logger: structlog.BoundLogger = structlog.get_logger(__name__)
 
-RATE_LIMIT_DURATION = 600
+# A rate limited proxy is benched for PROXY_BLOCK_BASE seconds, doubling with each
+# further block in a row up to PROXY_BLOCK_MAX.
+PROXY_BLOCK_BASE = 10 * 60
+PROXY_BLOCK_MAX = 4 * 60 * 60
 
 
 def _deactivate_and_new_session(session, log):
     log.warning("rate limited, deactivating proxy and switching")
-    proxy_config.deactivate_proxy(session.proxy_id, RATE_LIMIT_DURATION)
+    proxy_config.bench_proxy(session.proxy_id, PROXY_BLOCK_BASE, PROXY_BLOCK_MAX)
     return new_session()
 
 
@@ -31,6 +34,7 @@ def scrape_channel(
     except RateLimitError:
         session = _deactivate_and_new_session(session, log)
         profile = instagram.fetch_profile(channel, session)
+    proxy_config.proxy_succeeded(session.proxy_id)  # type: ignore[attr-defined]
 
     reels = profile.reels
     log.debug(f"got {len(reels)} reels for {channel}")

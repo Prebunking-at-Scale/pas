@@ -111,3 +111,33 @@ class TestDeactivateProxy:
             config = ProxyConfig()
         with pytest.raises(ValueError):
             config.get_proxy_details()
+
+
+class TestBenchProxy:
+    def test_first_block_uses_base(self):
+        config = _make_config()
+
+        assert config.bench_proxy(1, base=60, max_duration=600) == 60
+        assert 1 not in config._active_proxy_ids()
+
+    def test_repeated_blocks_double_up_to_max(self):
+        config = _make_config()
+
+        durations = [config.bench_proxy(1, base=60, max_duration=600) for _ in range(6)]
+
+        assert durations == [60, 120, 240, 480, 600, 600]
+
+    def test_success_resets_backoff(self):
+        config = _make_config()
+        config.bench_proxy(1, base=60, max_duration=600)
+        config.bench_proxy(1, base=60, max_duration=600)
+
+        config.proxy_succeeded(1)
+
+        assert config.bench_proxy(1, base=60, max_duration=600) == 60
+
+    def test_backoff_is_per_proxy(self):
+        config = _make_config()
+        config.bench_proxy(1, base=60, max_duration=600)
+
+        assert config.bench_proxy(2, base=60, max_duration=600) == 60
