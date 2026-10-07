@@ -21,6 +21,7 @@ class ProxyConfig:
         self.username = os.environ.get("PROXY_USERNAME", "")
         self.password = os.environ.get("PROXY_PASSWORD", "")
         self._inactive_until: dict[int, float] = {}
+        self._consecutive_blocks: dict[int, int] = {}
 
     @property
     def is_configured(self) -> bool:
@@ -35,6 +36,19 @@ class ProxyConfig:
             proxy_id=proxy_id,
             duration_seconds=duration,
         )
+
+    def bench_proxy(self, proxy_id: int, base: float, max_duration: float) -> float:
+        """Deactivate a blocked proxy for `base` seconds, doubling with each further
+        block in a row up to `max_duration`. Returns the duration used."""
+        blocks = self._consecutive_blocks.get(proxy_id, 0) + 1
+        self._consecutive_blocks[proxy_id] = blocks
+        duration = min(base * 2 ** (blocks - 1), max_duration)
+        self.deactivate_proxy(proxy_id, duration)
+        return duration
+
+    def proxy_succeeded(self, proxy_id: int) -> None:
+        """Reset a proxy's backoff after a request through it works."""
+        self._consecutive_blocks.pop(proxy_id, None)
 
     def _active_proxy_ids(self) -> list[int]:
         now = time.monotonic()

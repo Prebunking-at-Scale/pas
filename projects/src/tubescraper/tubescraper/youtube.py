@@ -20,8 +20,6 @@ POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "")
 PROXY_BLOCK_BASE = 30 * 60
 PROXY_BLOCK_MAX = 6 * 60 * 60
 
-_consecutive_blocks: dict[int, int] = {}
-
 # Substrings of yt-dlp errors that mean YouTube has flagged the requesting IP,
 # rather than there being a problem with the video itself.
 BLOCK_SIGNATURES = (
@@ -40,19 +38,7 @@ def bench_proxy_if_blocked(ex: Exception, proxy_id: int) -> None:
             event_metric="proxy_blocked",
             proxy_id=proxy_id,
         )
-        blocks = _consecutive_blocks.get(proxy_id, 0) + 1
-        _consecutive_blocks[proxy_id] = blocks
-        proxy_config.deactivate_proxy(proxy_id, block_duration(blocks))
-
-
-def block_duration(blocks: int) -> float:
-    """How long to bench a proxy that has been blocked `blocks` times in a row."""
-    return min(PROXY_BLOCK_BASE * 2 ** (blocks - 1), PROXY_BLOCK_MAX)
-
-
-def proxy_succeeded(proxy_id: int) -> None:
-    """Reset a proxy's backoff after a request through it works."""
-    _consecutive_blocks.pop(proxy_id, None)
+        proxy_config.bench_proxy(proxy_id, PROXY_BLOCK_BASE, PROXY_BLOCK_MAX)
 
 
 def channel_url(channel: str) -> str:
@@ -88,7 +74,7 @@ def channel_shorts(channel: str, num: int = 200) -> list[dict[Any, Any]]:
         with yt_dlp.YoutubeDL(opts) as ydl:
             logger.info(f"fetching entries for {channel}")
             info = ydl.extract_info(channel_url(channel), download=False)
-            proxy_succeeded(proxy_id)
+            proxy_config.proxy_succeeded(proxy_id)
 
             if not info:
                 raise ValueError("Empty info dict")
@@ -136,7 +122,7 @@ def keyword_shorts(keyword, num: int = 200) -> list[dict[Any, Any]]:
                 f'https://www.youtube.com/results?search_query="{keyword}"&sp=CAISBggDEAkYAQ%253D%253D',
                 download=False,
             )
-            proxy_succeeded(proxy_id)
+            proxy_config.proxy_succeeded(proxy_id)
 
             if not info:
                 raise ValueError("Empty info dict")
@@ -187,7 +173,7 @@ def video_details(entry_id: str, buf: io.BytesIO | None = None) -> dict[Any, Any
         try:
             with yt_dlp.YoutubeDL(ctx) as video:
                 details = video.extract_info(entry_id, download=download)
-                proxy_succeeded(proxy_id)
+                proxy_config.proxy_succeeded(proxy_id)
                 details = cast(dict[Any, Any], details)
         except yt_dlp.utils.DownloadError as ex:
             bench_proxy_if_blocked(ex, proxy_id)
