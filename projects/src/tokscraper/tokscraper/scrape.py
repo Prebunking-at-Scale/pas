@@ -108,6 +108,12 @@ def download_channel_shorts(
                 log.info("entry is none, continuing...")
                 continue
 
+            # Photo posts have no duration in the listing and nothing yt-dlp can
+            # download, so trying them only uses up proxy requests.
+            if not entry.get("duration"):
+                log.info("skipping photo post")
+                continue
+
             buf = io.BytesIO()
             try:
                 existing_video = api_client.get_video(entry["id"], PLATFORM)
