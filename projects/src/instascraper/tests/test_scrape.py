@@ -46,7 +46,8 @@ def test_downloads_new_video(mock_instagram, mock_coreapi, mocknew_session):
     profile = _make_profile()
     reel = _make_reel("reel1", profile)
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: [reel])
+    mock_instagram.fetch_reel.side_effect = lambda reel, session: reel
+    profile.reels = [reel]
 
     mock_coreapi.get_video.return_value = None
 
@@ -71,7 +72,7 @@ def test_updates_stats_for_existing_video(
     profile = _make_profile()
     reel = _make_reel("reel1", profile)
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: [reel])
+    profile.reels = [reel]
 
     mock_coreapi.get_video.return_value = {"id": "db-video-id"}
 
@@ -99,7 +100,8 @@ def test_downloads_new_and_updates_existing(
     new_reel = _make_reel("new_reel", profile)
     old_reel = _make_reel("old_reel", profile)
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: [new_reel, old_reel])
+    mock_instagram.fetch_reel.side_effect = lambda reel, session: reel
+    profile.reels = [new_reel, old_reel]
 
     mock_coreapi.get_video.side_effect = [None, {"id": "db-id"}]
 
@@ -121,7 +123,7 @@ def test_no_reels_returns_none(mock_instagram, mock_coreapi, mocknew_session):
 
     profile = _make_profile()
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: [])
+    profile.reels = []
 
     storage = MagicMock()
     result = scrape_channel("test_user", None, storage, [])
@@ -146,7 +148,7 @@ def test_retries_profile_fetch_on_rate_limit(
 
     profile = _make_profile()
     mock_instagram.fetch_profile.side_effect = [RateLimitError("rate limited"), profile]
-    type(profile).reels = property(lambda self: [])
+    profile.reels = []
 
     storage = MagicMock()
     result = scrape_channel("test_user", None, storage, [])
@@ -174,7 +176,8 @@ def test_retries_video_download_on_rate_limit(
     profile = _make_profile()
     reel = _make_reel("reel1", profile)
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: [reel])
+    mock_instagram.fetch_reel.side_effect = lambda reel, session: reel
+    profile.reels = [reel]
 
     mock_coreapi.get_video.return_value = None
     mock_video_bytes.side_effect = [
@@ -203,7 +206,8 @@ def test_logs_registration_result(
     profile = _make_profile()
     reels = [_make_reel("ok", profile), _make_reel("rejected", profile)]
     mock_instagram.fetch_profile.return_value = profile
-    type(profile).reels = property(lambda self: reels)
+    mock_instagram.fetch_reel.side_effect = lambda reel, session: reel
+    profile.reels = reels
     mock_coreapi.get_video.return_value = None
     mock_coreapi.register_download.side_effect = [True, False]
     mocknew_session.return_value.get.return_value.content = b"video"
@@ -215,3 +219,41 @@ def test_logs_registration_result(
         (e.get("event_metric"), e.get("reel_id")) for e in logs if e.get("event_metric")
     ]
     assert metrics == [("download_success", "ok"), ("register_failure", "rejected")]
+
+
+@patch("instascraper.scrape.proxy_config")
+@patch("instascraper.scrape.new_session")
+@patch("instascraper.scrape.coreapi")
+@patch("instascraper.scrape.instagram")
+@patch.object(Reel, "video_bytes")
+def test_retries_reel_page_on_rate_limit(
+    mock_video_bytes, mock_instagram, mock_coreapi, mock_new_session, mock_proxy_config
+):
+    first_session = MagicMock()
+    first_session.proxy_id = 1
+    second_session = MagicMock()
+    second_session.proxy_id = 2
+    mock_new_session.side_effect = [first_session, second_session]
+
+    profile = _make_profile()
+    reel = _make_reel("reel1", profile)
+    mock_instagram.fetch_profile.return_value = profile
+    mock_instagram.fetch_reel.side_effect = [
+        RateLimitError("redirected to login"),
+        reel,
+    ]
+    profile.reels = [reel]
+
+    mock_coreapi.get_video.return_value = None
+    mock_video_bytes.return_value = io.BytesIO(b"video")
+
+    storage = MagicMock()
+    storage.upload_blob.return_value = "blob/path"
+
+    result = scrape_channel("test_user", None, storage, [])
+
+    assert result == "reel1"
+    mock_proxy_config.deactivate_proxy.assert_called_once_with(1, RATE_LIMIT_DURATION)
+    assert mock_instagram.fetch_reel.call_args.args == (reel, second_session)
+    mock_video_bytes.assert_called_once_with(second_session)
+    mock_coreapi.register_download.assert_called_once()
