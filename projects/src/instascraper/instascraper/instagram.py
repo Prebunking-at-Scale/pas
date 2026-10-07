@@ -1,13 +1,15 @@
 import io
 import json
 import random
+import re
 import time
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from typing import Any
 
 import structlog
 from curl_cffi.requests import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from scraper_common import proxy_config
 from structlog.contextvars import bind_contextvars
 
@@ -75,12 +77,15 @@ class Reel(BaseModel):
     view_count: int
     likes_count: int
     comment_count: int
-    timestamp: str
-    description: str
-    video_url: str
+    # Only on the reel's own page, so None until fetch_reel has been called.
+    timestamp: str | None = None
+    description: str = ""
+    video_url: str | None = None
     raw: dict[str, Any]
 
     def video_bytes(self, session: Session) -> io.BytesIO:
+        if not self.video_url:
+            raise InstagramError(f"no video url for reel {self.shortcode}")
         logger.info("fetching video", user=self.profile.username, video_id=self.id)
         _random_sleep()
         resp = session.get(self.video_url, timeout=600)
@@ -96,73 +101,114 @@ class Profile(BaseModel):
     display_name: str
     followers: int
     following: int
+    # Excluded from repr and dumps because each reel points back to its profile.
+    reels: list[Reel] = Field(default_factory=list, repr=False, exclude=True)
     raw: dict[str, Any]
 
-    @property
-    def reels(self) -> list[Reel]:
-        """Fetch up to the 12 most recent reels posted by the user.
 
-        "up to" because we're only able to fetch the 12 most recent posts (inc. images)
-        and then have to filter out any non-video posts"""
-        timeline_media = self.raw.get("edge_owner_to_timeline_media", {})
-        if not timeline_media:
-            InstagramError(f"Could not get media for {self.username}")
+def _page_json(html: str) -> Iterator[Any]:
+    """Yield the JSON blobs Instagram embeds in its pages for logged-out viewers."""
+    for blob in re.findall(
+        r'<script type="application/json"[^>]*>(.*?)</script>', html, re.S
+    ):
+        try:
+            yield json.loads(blob)
+        except json.JSONDecodeError:
+            continue
 
-        reels = []
-        for edge in timeline_media.get("edges", []):
-            node = edge.get("node", {})
-            if node.get("__typename") != "GraphVideo":
-                continue
 
-            description = ""
-            captions = node.get("edge_media_to_caption")
-            if captions.get("edges"):
-                description = captions.get("edges")[0].get("node", {}).get("text", "")
+def _find(html: str, match: Callable[[dict[str, Any]], bool]) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
 
-            taken_at = datetime.fromtimestamp(node.get("taken_at_timestamp"))
+    def walk(obj: Any) -> None:
+        if isinstance(obj, dict):
+            if match(obj):
+                found.append(obj)
+            for value in obj.values():
+                walk(value)
+        elif isinstance(obj, list):
+            for value in obj:
+                walk(value)
 
-            reels.append(
-                Reel(
-                    id=node.get("id"),
-                    profile=self,
-                    shortcode=node.get("shortcode"),
-                    view_count=node.get("video_view_count")
-                    or node.get("play_count", 0),
-                    likes_count=node.get("edge_liked_by", {}).get("count"),
-                    comment_count=node.get("edge_media_to_comment", {}).get("count"),
-                    timestamp=taken_at.isoformat(),
-                    description=description,
-                    video_url=node.get("video_url"),
-                    raw=node,
-                )
-            )
+    for blob in _page_json(html):
+        walk(blob)
+    return found
 
-        return reels
+
+def _fetch_page(url: str, session: Session) -> str:
+    resp = session.get(url, timeout=10, headers={"Accept": "text/html"})
+    if resp.status_code in (401, 429):
+        raise RateLimitError(f"Rate limited (HTTP {resp.status_code})")
+    # Instagram sends some IPs to the login page instead of the public page.
+    if "/accounts/login" in str(resp.url):
+        raise RateLimitError("redirected to login")
+    resp.raise_for_status()
+    return resp.text
 
 
 def fetch_profile(username: str, session: Session) -> Profile:
+    """Fetch a user's details and their 12 most recent reels from the reels tab."""
     logger.info("fetching profile", username=username)
-    resp = session.get(
-        f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
-        timeout=10,
+    html = _fetch_page(f"https://www.instagram.com/{username}/reels/", session)
+
+    users = _find(
+        html,
+        lambda o: (
+            str(o.get("username", "")).lower() == username.lower()
+            and "follower_count" in o
+        ),
     )
-    if resp.status_code in (401, 429):
-        raise RateLimitError(f"Rate limited (HTTP {resp.status_code})")
-    resp.raise_for_status()
+    if not users:
+        raise InstagramError(f"could not find profile data for {username}")
+    user = users[0]
 
-    json_resp = resp.json()
-    if "error" in json_resp:
-        raise InstagramError(json_resp["error"])
-
-    if "data" not in json_resp or "user" not in json_resp["data"]:
-        raise InstagramError("unexpected response:\n", json.dumps(json_resp, indent=2))
-
-    user = resp.json()["data"]["user"]
-    return Profile(
-        id=user["id"],
+    profile = Profile(
+        id=user["pk"],
         username=user["username"],
-        display_name=user["full_name"],
-        followers=user["edge_followed_by"]["count"],
-        following=user["edge_follow"]["count"],
+        display_name=user.get("full_name") or "",
+        followers=user.get("follower_count") or 0,
+        following=user.get("following_count") or 0,
         raw=user,
+    )
+
+    clips = _find(
+        html, lambda o: o.get("pk") == user["pk"] and "polaris_clips_connection" in o
+    )
+    edges = clips[0]["polaris_clips_connection"]["edges"] if clips else []
+    profile.reels = [
+        Reel(
+            id=node["pk"],
+            profile=profile,
+            shortcode=node["code"],
+            view_count=node.get("play_count") or 0,
+            likes_count=node.get("like_count") or 0,
+            comment_count=node.get("comment_count") or 0,
+            raw=node,
+        )
+        for node in (edge["node"] for edge in edges)
+    ]
+    return profile
+
+
+def fetch_reel(reel: Reel, session: Session) -> Reel:
+    """Add the video url, upload time and caption from the reel's own page."""
+    logger.info("fetching reel", user=reel.profile.username, video_id=reel.id)
+    _random_sleep()
+    html = _fetch_page(f"https://www.instagram.com/reel/{reel.shortcode}/", session)
+
+    media = _find(
+        html,
+        lambda o: o.get("code") == reel.shortcode and bool(o.get("video_versions")),
+    )
+    if not media:
+        raise InstagramError(f"could not find video data for reel {reel.shortcode}")
+    node = media[0]
+
+    caption = node.get("caption") or {}
+    return reel.model_copy(
+        update={
+            "video_url": node["video_versions"][0]["url"],
+            "timestamp": datetime.fromtimestamp(node["taken_at"]).isoformat(),
+            "description": caption.get("text") or "",
+        }
     )

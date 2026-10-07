@@ -43,6 +43,12 @@ def scrape_channel(
                 continue
 
             try:
+                reel = instagram.fetch_reel(reel, session)
+            except RateLimitError:
+                session = _deactivate_and_new_session(session, log)
+                reel = instagram.fetch_reel(reel, session)
+
+            try:
                 bytes = reel.video_bytes(session)
             except RateLimitError:
                 session = _deactivate_and_new_session(session, log)
