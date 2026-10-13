@@ -2,9 +2,29 @@
 
 ## Introduction
 
-This is a monorepo for the prebunking-at-scale project, consisting of the infrastructure,
-deployment tooling and application code. It is a work-in-progress and do expect process
-and code changes as we refine the approach over the coming weeks.
+Prebunking at Scale (PAS) monitors short-form video for harmful claims. This repository
+contains the scrapers that collect that video. Each scraper reads a list of channels or
+keywords from the Core API, downloads new videos to storage, and registers each video and
+its metadata with the Core API.
+
+| Path | Contents |
+|------|----------|
+| `projects/src/tubescraper` | YouTube Shorts scraper |
+| `projects/src/tokscraper` | TikTok scraper |
+| `projects/src/instascraper` | Instagram Reels scraper |
+| `projects/lib/scraper_common` | Shared code: feed models, storage, proxies and the Core API client |
+| `projects/lib/pas_log` | Shared logging setup |
+| `deployments/` | Kustomize manifests for running the scrapers on Kubernetes |
+| `.github/workflows/` | Image build and deployment workflows |
+
+### Related repositories
+
+The rest of PAS lives in other repositories:
+
+- [core-api](https://github.com/Prebunking-at-Scale/core-api): the API the scrapers read from and write to. It stores video metadata and runs the analysis.
+- [harmful-claim-finder](https://github.com/Prebunking-at-Scale/harmful-claim-finder): a library that finds claims in video transcripts. Core API uses it.
+- [pas-frontend](https://github.com/Prebunking-at-Scale/pas-frontend): the web application for viewing the results.
+- [pas-infrastructure](https://github.com/Prebunking-at-Scale/pas-infrastructure): Terraform for the cloud infrastructure, including the clusters these scrapers run on.
 
 ## Getting started
 
