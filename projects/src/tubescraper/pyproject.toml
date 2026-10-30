@@ -15,7 +15,7 @@ dependencies = [
     "scraper-common",
     "structlog>=25.4.0",
     "tenacity>=9.1.2",
-    "yt-dlp[default,curl-cffi]==2026.8.19",
+    "yt-dlp[default,curl-cffi]==2026.10.26",
 ]
 
 [tool.uv]
